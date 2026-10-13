@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { SignInForm } from '@/components/sign-in-form';
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -61,12 +62,11 @@ export default function AccountScreen() {
               </ThemedText>
             )}
             <View style={styles.row}>
-              <Pressable
+              <Button
+                title={status.state === 'syncing' ? 'Syncing…' : 'Sync now'}
                 onPress={() => syncNow(db)}
                 disabled={status.state === 'syncing'}
-                style={[styles.button, { backgroundColor: theme.accent }]}>
-                <ThemedText style={styles.buttonText}>{status.state === 'syncing' ? 'Syncing…' : 'Sync now'}</ThemedText>
-              </Pressable>
+              />
               <Pressable onPress={signOut} hitSlop={6}>
                 <ThemedText style={{ color: theme.danger }}>Sign out</ThemedText>
               </Pressable>
@@ -85,6 +85,4 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.three, gap: Spacing.three },
   card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  button: { borderRadius: 999, paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.four, alignItems: 'center' },
-  buttonText: { color: '#ffffff', fontSize: 16 },
 });

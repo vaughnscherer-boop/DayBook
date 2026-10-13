@@ -8,6 +8,7 @@ import { NotificationSettings } from '@/components/notification-settings';
 import { PhoneCalendars } from '@/components/phone-calendars';
 import { SignInForm } from '@/components/sign-in-form';
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { listCalendars, type Calendar } from '@/db/calendars';
@@ -159,20 +160,15 @@ export default function OnboardingScreen() {
         <View style={styles.footer}>
           {step === 'done' ? (
             <>
-              <Pressable onPress={() => finish('/import')} style={[styles.primary, { backgroundColor: theme.accent }]}>
-                <ThemedText style={styles.primaryText}>Import a syllabus</ThemedText>
-              </Pressable>
-              <Pressable onPress={() => finish('/')} style={styles.secondary}>
-                <ThemedText style={{ color: theme.accent }}>Go to my calendar</ThemedText>
-              </Pressable>
+              <Button title="Import a syllabus" onPress={() => finish('/import')} />
+              <Button title="Go to my calendar" variant="ghost" onPress={() => finish('/')} />
             </>
           ) : (
             <>
-              <Pressable onPress={next} style={[styles.primary, { backgroundColor: theme.accent }]}>
-                <ThemedText style={styles.primaryText}>
-                  {step === 'sync' && !signedIn ? 'Not now' : step === 'welcome' ? 'Get started' : 'Next'}
-                </ThemedText>
-              </Pressable>
+              <Button
+                title={step === 'sync' && !signedIn ? 'Not now' : step === 'welcome' ? 'Get started' : 'Next'}
+                onPress={next}
+              />
               {index > 0 && (
                 <Pressable onPress={() => setIndex(index - 1)} style={styles.secondary}>
                   <ThemedText themeColor="textSecondary">Back</ThemedText>
@@ -204,7 +200,5 @@ const styles = StyleSheet.create({
   flex: { flex: 1, gap: 2 },
   card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.one },
   footer: { padding: Spacing.three, gap: Spacing.two, maxWidth: 560, width: '100%', alignSelf: 'center' },
-  primary: { borderRadius: 999, paddingVertical: Spacing.two + 4, alignItems: 'center' },
-  primaryText: { color: '#ffffff', fontSize: 17 },
   secondary: { alignItems: 'center', paddingVertical: Spacing.two },
 });

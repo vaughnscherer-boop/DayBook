@@ -85,8 +85,8 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
         updated_at TEXT NOT NULL
       );
       INSERT INTO calendars (id, name, color, is_default, sort_order, created_at, updated_at) VALUES
-        ('personal', 'Personal', '#1A8CFF', 1, 0, '${now}', '${now}'),
-        ('work', 'Work', '#FF9500', 0, 1, '${now}', '${now}');
+        ('personal', 'Personal', '#959BDB', 1, 0, '${now}', '${now}'),
+        ('work', 'Work', '#E2583B', 0, 1, '${now}', '${now}');
 
       ALTER TABLE events ADD COLUMN calendar_id TEXT;
       ALTER TABLE events ADD COLUMN color TEXT;  -- NULL = use the calendar's color

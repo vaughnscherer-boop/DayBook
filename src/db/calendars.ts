@@ -114,6 +114,6 @@ export function itemColor(
     item.color ??
     (group && typeColor(group, itemTypeOf(item, kind, group))) ??
     (item.calendar_id && calendarsById[item.calendar_id]?.color) ??
-    '#8E8E93'
+    '#8A8278'
   );
 }

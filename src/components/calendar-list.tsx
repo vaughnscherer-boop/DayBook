@@ -6,6 +6,7 @@ import { ColorSwatches } from '@/components/color-swatches';
 import { GroupList } from '@/components/group-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Icon } from '@/components/ui/icon';
 import { EventColors, Spacing } from '@/constants/theme';
 import {
   createCalendar,
@@ -16,6 +17,7 @@ import {
 } from '@/db/calendars';
 import type { Group } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
+import { textOn } from '@/lib/calendar-items';
 import { confirmDestructive } from '@/lib/confirm';
 
 type Props = { calendars: Calendar[]; groups: Group[]; onChanged: () => void };
@@ -108,7 +110,7 @@ function CalendarRow({ calendar, editing, ...actions }: RowProps) {
             { borderColor: calendar.color },
             visible && { backgroundColor: calendar.color },
           ]}>
-          {visible && <ThemedText style={styles.checkmark}>✓</ThemedText>}
+          {visible && <Icon name="checkmark" size={12} weight="bold" color={textOn(calendar.color)} />}
         </Pressable>
         <ThemedText numberOfLines={1} style={styles.name} themeColor={visible ? 'text' : 'textSecondary'}>
           {calendar.name}
@@ -118,7 +120,7 @@ function CalendarRow({ calendar, editing, ...actions }: RowProps) {
             Default
           </ThemedText>
         )}
-        <ThemedText themeColor="textSecondary">{editing ? '▴' : '▾'}</ThemedText>
+        <Icon name={editing ? 'collapse' : 'expand'} size={14} color={theme.textSecondary} />
       </Pressable>
 
       {editing && (

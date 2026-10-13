@@ -38,13 +38,14 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#161616",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
       ],
       "expo-sqlite",
       "./plugins/without-push-entitlement",
+      "./plugins/with-scene-lifecycle",
       "expo-notifications",
       [
         "expo-calendar",

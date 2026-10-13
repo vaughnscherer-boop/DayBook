@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -90,13 +91,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           {message.text}
         </ThemedText>
       )}
-      <Pressable onPress={submit} disabled={busy} style={[styles.button, { backgroundColor: theme.accent }]}>
-        {busy ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <ThemedText style={styles.buttonText}>{mode === 'signIn' ? 'Sign in' : 'Create account'}</ThemedText>
-        )}
-      </Pressable>
+      <Button title={mode === 'signIn' ? 'Sign in' : 'Create account'} onPress={submit} busy={busy} />
       <Pressable
         onPress={() => {
           setMode(mode === 'signIn' ? 'signUp' : 'signIn');
@@ -114,6 +109,4 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 const styles = StyleSheet.create({
   card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
   input: { fontSize: 17, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: Spacing.two },
-  button: { borderRadius: 999, paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.four, alignItems: 'center' },
-  buttonText: { color: '#ffffff', fontSize: 16 },
 });

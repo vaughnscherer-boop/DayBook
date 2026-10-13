@@ -59,5 +59,16 @@ export function useCalendarData() {
   // Course groups and their meetings, for "due next class".
   const classes = useMemo(() => buildClasses(groups, events), [groups, events]);
 
-  return { itemsBetween, calendars, groups, classes, reload };
+  // Groups with something to do in them: a timed event or any task. The rest hold only all-day
+  // dates (holidays like Christmas or daylight saving, term start/end) and Home leaves them out.
+  const activeGroupIds = useMemo(
+    () =>
+      new Set([
+        ...events.filter((event) => event.all_day === 0).map((event) => event.group_id),
+        ...tasks.map((task) => task.group_id),
+      ].filter((id): id is string => id !== null)),
+    [events, tasks]
+  );
+
+  return { itemsBetween, calendars, groups, classes, activeGroupIds, reload };
 }

@@ -127,6 +127,9 @@ export function PagedCalendar({ axis, pageKey, pageKeys, renderPage, onNext, onP
       // Week/Day only page on sideways scrolling; vertical wheel scrolls the hours.
       if (horizontal && Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
       event.preventDefault();
+      // Snap distances use `size`; take the live width in case a resize was missed.
+      const live = horizontal ? node.clientWidth : node.clientHeight;
+      if (live > 0) setSize((current) => (current === live ? current : live));
       const delta = horizontal ? event.deltaX : event.deltaY;
       const direction = delta > 0 ? 1 : -1;
       const deltaSize = Math.abs(delta);
@@ -192,7 +195,14 @@ export function PagedCalendar({ axis, pageKey, pageKeys, renderPage, onNext, onP
                 // Neighbours are off-screen until dragged in; hide them from screen readers.
                 importantForAccessibility={page === 0 ? 'auto' : 'no-hide-descendants'}
                 accessibilityElementsHidden={page !== 0}
-                style={[StyleSheet.absoluteFill, horizontal ? { left: page * size, right: -page * size } : { top: page * size, bottom: -page * size }]}>
+                // Percentages, not the measured size: a stale measurement (after a resize or the side
+                // panel toggling) would otherwise let the neighbours overlap the visible page.
+                style={[
+                  styles.page,
+                  horizontal
+                    ? { left: `${page * 100}%`, top: 0, bottom: 0, width: '100%' }
+                    : { top: `${page * 100}%`, left: 0, right: 0, height: '100%' },
+                ]}>
                 {renderPage(page)}
               </View>
             ))}
@@ -203,4 +213,7 @@ export function PagedCalendar({ axis, pageKey, pageKeys, renderPage, onNext, onP
   );
 }
 
-const styles = StyleSheet.create({ viewport: { flex: 1, overflow: 'hidden' } });
+const styles = StyleSheet.create({
+  viewport: { flex: 1, overflow: 'hidden' },
+  page: { position: 'absolute' },
+});

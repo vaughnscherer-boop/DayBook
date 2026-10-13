@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Icon } from '@/components/ui/icon';
+import { Chip } from '@/components/ui/chip';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatTime } from '@/lib/dates';
@@ -71,20 +73,12 @@ export function ImportCourseCard({ course, choice, onChange }: Props) {
             {course.sections.map((section) => {
               const selected = choice.section === section;
               return (
-                <Pressable
+                <Chip
                   key={section}
+                  label={section}
+                  selected={selected}
                   onPress={() => onChange(changeSection(course, choice, section))}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  style={[
-                    styles.chip,
-                    { borderColor: selected ? theme.accent : theme.backgroundSelected },
-                    selected && { backgroundColor: theme.accent },
-                  ]}>
-                  <ThemedText type="small" style={selected && styles.selectedText}>
-                    {section}
-                  </ThemedText>
-                </Pressable>
+                />
               );
             })}
           </View>
@@ -142,6 +136,7 @@ type GroupProps = {
 
 /** "Assignments (25)" with an all/none checkbox; long lists start folded. */
 function ItemGroup({ title, rows, checked, onSet }: GroupProps) {
+  const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
   const indexes = rows.map((row) => row.index);
   const count = indexes.filter((i) => checked[i]).length;
@@ -155,7 +150,7 @@ function ItemGroup({ title, rows, checked, onSet }: GroupProps) {
         accessibilityRole="checkbox"
         accessibilityState={{ checked: all ? true : count === 0 ? false : 'mixed' }}
         style={styles.groupHeader}>
-        <ThemedText style={styles.box}>{all ? '☑' : count === 0 ? '☐' : '◩'}</ThemedText>
+        <Icon name={all ? 'checked' : count === 0 ? 'unchecked' : 'partial'} color={theme.accent} />
         <ThemedText type="smallBold" style={styles.flex}>
           {title}
         </ThemedText>
@@ -194,9 +189,10 @@ type CheckRowProps = {
 };
 
 function CheckRow({ checked, onToggle, title, detail, description }: CheckRowProps) {
+  const theme = useTheme();
   return (
     <Pressable onPress={onToggle} accessibilityRole="checkbox" accessibilityState={{ checked }} style={styles.row}>
-      <ThemedText style={styles.box}>{checked ? '☑' : '☐'}</ThemedText>
+      <Icon name={checked ? 'checked' : 'unchecked'} color={theme.accent} />
       <View style={styles.flex}>
         <ThemedText type="small" numberOfLines={2} themeColor={checked ? 'text' : 'textSecondary'}>
           {title}
@@ -218,8 +214,6 @@ const styles = StyleSheet.create({
   card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
   block: { gap: Spacing.one },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: Spacing.half },
-  selectedText: { color: '#ffffff' },
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.half },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two, paddingVertical: 3, paddingLeft: Spacing.two },
   box: { fontSize: 18, lineHeight: 22, width: 20 },

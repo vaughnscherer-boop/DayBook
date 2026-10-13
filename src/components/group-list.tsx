@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { ColorSwatches } from '@/components/color-swatches';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Icon } from '@/components/ui/icon';
 import { Spacing } from '@/constants/theme';
 import { deleteGroup, mergeGroups, updateGroup, type Group } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,13 +16,16 @@ type Props = {
   /** Groups of one calendar. */
   groups: Group[];
   onChanged: () => void;
+  /** Show only this group, already open for editing (the Edit sheet from Home's class cards). */
+  focusId?: string;
 };
 
 /** A calendar's groups (made automatically); tap one to rename, recolor, merge or delete it. */
-export function GroupList({ groups, onChanged }: Props) {
+export function GroupList({ groups, onChanged, focusId }: Props) {
   const db = useSQLiteContext();
-  const [editing, setEditing] = useState<string | null>(null);
-  if (groups.length === 0) return null;
+  const [editing, setEditing] = useState<string | null>(focusId ?? null);
+  const shown = focusId ? groups.filter((group) => group.id === focusId) : groups;
+  if (shown.length === 0) return null;
 
   const change = async (action: Promise<unknown>) => {
     await action;
@@ -30,7 +34,7 @@ export function GroupList({ groups, onChanged }: Props) {
 
   return (
     <View style={styles.container}>
-      {groups.map((group) => (
+      {shown.map((group) => (
         <GroupRow
           key={group.id}
           group={group}
@@ -86,9 +90,7 @@ function GroupRow({ group, others, editing, ...actions }: RowProps) {
         <ThemedText type="small" numberOfLines={1} style={styles.name}>
           {group.name}
         </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {editing ? '▴' : '▾'}
-        </ThemedText>
+        <Icon name={editing ? 'collapse' : 'expand'} size={14} color={theme.textSecondary} />
       </Pressable>
 
       {editing && (

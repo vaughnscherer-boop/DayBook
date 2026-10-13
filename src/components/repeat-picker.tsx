@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { DateTimeField } from '@/components/date-time-field';
 import { ThemedText } from '@/components/themed-text';
+import { Chip } from '@/components/ui/chip';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fromKey, toDateKey } from '@/lib/dates';
@@ -76,19 +77,7 @@ export function RepeatPicker({ rule, until, startDay, onChange, onUntilChange }:
         {PRESETS.map(({ value, label }) => {
           const selected = value === preset;
           return (
-            <Pressable
-              key={value}
-              onPress={() => choose(value)}
-              accessibilityState={{ selected }}
-              style={[
-                styles.chip,
-                { borderColor: selected ? theme.accent : theme.backgroundSelected },
-                selected && { backgroundColor: theme.accent },
-              ]}>
-              <ThemedText type="small" style={selected ? styles.selectedText : undefined}>
-                {label}
-              </ThemedText>
-            </Pressable>
+            <Chip key={value} label={label} selected={selected} onPress={() => choose(value)} />
           );
         })}
       </ScrollView>
@@ -103,7 +92,7 @@ export function RepeatPicker({ rule, until, startDay, onChange, onUntilChange }:
                 onPress={() => toggleWeekday(day)}
                 accessibilityState={{ selected: on }}
                 style={[styles.weekday, { borderColor: theme.backgroundSelected }, on && { backgroundColor: theme.accent }]}>
-                <ThemedText type="small" style={on ? styles.selectedText : undefined}>
+                <ThemedText type="small" style={on ? { color: theme.onAccent } : undefined}>
                   {letter}
                 </ThemedText>
               </Pressable>
@@ -136,8 +125,6 @@ const styles = StyleSheet.create({
   container: { gap: Spacing.two },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   chips: { gap: Spacing.two },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: Spacing.half },
-  selectedText: { color: '#ffffff' },
   weekdays: { flexDirection: 'row', gap: Spacing.one },
   weekday: {
     width: 32,

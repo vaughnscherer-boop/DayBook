@@ -184,6 +184,13 @@ export function weekSegments(items: CalendarItem[], week: string[]): WeekSegment
   });
 }
 
+/** `hex` at `alpha` opacity, for soft tinted fills. */
+export function tint(hex: string, alpha: number): string {
+  return `${hex.slice(0, 7)}${Math.round(alpha * 255)
+    .toString(16)
+    .padStart(2, '0')}`;
+}
+
 /** Black or white, whichever reads better on `hex`. */
 export function textOn(hex: string): string {
   const n = parseInt(hex.slice(1), 16);

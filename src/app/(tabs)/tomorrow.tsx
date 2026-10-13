@@ -1,11 +1,15 @@
-import { router, Stack } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTabBarSpace } from '@/components/bottom-bar';
 import { DayItemRow } from '@/components/day-item-row';
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
+import { TaskCheck } from '@/components/ui/task-check';
 import { Spacing } from '@/constants/theme';
 import { getSettings } from '@/db/settings';
 import { useCalendarData } from '@/hooks/use-calendar-data';
@@ -17,7 +21,6 @@ import { rescheduleAll } from '@/lib/notifications';
 import { planLines, planningDay, type PlannedLine } from '@/lib/tomorrow-list';
 
 type Row = { id: number; text: string };
-const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
 /** "Tue, Oct 13 · 7:00–8:00 AM", "due Wed 8:00 AM (next LAT 111 class)", "Tue, Oct 13" … */
 function when(line: PlannedLine, day: string): string {
@@ -41,7 +44,10 @@ export default function TomorrowScreen() {
   const db = useSQLiteContext();
   const theme = useTheme();
   const { itemsBetween, calendars, classes } = useCalendarData();
-  const [day] = useState(() => planningDay());
+  const tabBarSpace = useTabBarSpace();
+  // A tab stays mounted: recompute which day we're planning each time it's shown.
+  const [day, setDay] = useState(() => planningDay());
+  useFocusEffect(useCallback(() => setDay(planningDay()), []));
   const [rows, setRows] = useState<Row[]>([{ id: 0, text: '' }]);
   const nextId = useRef(1);
   const inputs = useRef(new Map<number, TextInput>());
@@ -98,7 +104,11 @@ export default function TomorrowScreen() {
     setSaving(true);
     for (const line of lines) await createFromParsed(db, line.kind, line.parsed, line.calendar?.id ?? null);
     rescheduleAll(db);
-    router.replace({ pathname: '/', params: { date: day } });
+    // The tab stays mounted, so clear the list for next time.
+    setRows([{ id: nextId.current++, text: '' }]);
+    setChosenClasses({});
+    setSaving(false);
+    router.navigate({ pathname: '/calendar', params: { date: day } });
   };
 
   const colorOf = ({ parsed, calendar }: PlannedLine) => {
@@ -109,16 +119,7 @@ export default function TomorrowScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: 'Plan tomorrow',
-          headerLeft: () => (
-            <Pressable onPress={close} hitSlop={8}>
-              <ThemedText style={{ color: theme.accent }}>Close</ThemedText>
-            </Pressable>
-          ),
-        }}
-      />
+      <SafeAreaView edges={['top']} style={styles.container}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View>
@@ -191,7 +192,7 @@ export default function TomorrowScreen() {
               {lines.map((line, i) => (
                 <View key={`${i}-${line.text}`} style={styles.previewRow}>
                   {line.kind === 'task' ? (
-                    <ThemedText style={[styles.check, { color: colorOf(line) }]}>☐</ThemedText>
+                    <TaskCheck done={false} color={colorOf(line)} />
                   ) : (
                     <View style={[styles.bar, { backgroundColor: colorOf(line) }]} />
                   )}
@@ -234,24 +235,22 @@ export default function TomorrowScreen() {
           )}
         </ScrollView>
 
-        <ThemedView style={[styles.footer, { borderColor: theme.backgroundSelected }]}>
-          <Pressable
+        <ThemedView style={[styles.footer, { borderColor: theme.backgroundSelected, paddingBottom: tabBarSpace + Spacing.two }]}>
+          <Button
             onPress={save}
-            disabled={saving || lines.length === 0 || waiting > 0}
-            style={[
-              styles.primary,
-              { backgroundColor: lines.length === 0 || waiting > 0 ? theme.backgroundSelected : theme.accent },
-            ]}>
-            <ThemedText style={styles.primaryText}>
-              {waiting > 0
+            disabled={lines.length === 0 || waiting > 0}
+            busy={saving}
+            title={
+              waiting > 0
                 ? `Pick a class for ${waiting} line${waiting === 1 ? '' : 's'}`
                 : lines.length === 0
                   ? 'Type what you need to do'
-                  : `Add ${lines.length} to your calendar`}
-            </ThemedText>
-          </Pressable>
+                  : `Add ${lines.length} to your calendar`
+            }
+          />
         </ThemedView>
       </KeyboardAvoidingView>
+      </SafeAreaView>
     </ThemedView>
   );
 }
@@ -281,6 +280,4 @@ const styles = StyleSheet.create({
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   footer: { padding: Spacing.three, borderTopWidth: StyleSheet.hairlineWidth },
-  primary: { borderRadius: 999, paddingVertical: Spacing.two + 2, alignItems: 'center' },
-  primaryText: { color: '#ffffff', fontSize: 16 },
 });

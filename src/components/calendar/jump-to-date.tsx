@@ -34,7 +34,8 @@ export function JumpToDate({ visible, date, onPick, onClose }: Props) {
       textDisabledColor: theme.textSecondary,
       todayTextColor: theme.accent,
       selectedDayBackgroundColor: theme.accent,
-      selectedDayTextColor: '#ffffff',
+      selectedDayTextColor: theme.onAccent,
+      textMonthFontWeight: '800' as const,
       arrowColor: theme.accent,
     }),
     [theme]

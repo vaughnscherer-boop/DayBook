@@ -1,0 +1,24 @@
+diff --git a/node_modules/react-native-safe-area-context/ios/Fabric/RNCSafeAreaViewComponentView.mm b/node_modules/react-native-safe-area-context/ios/Fabric/RNCSafeAreaViewComponentView.mm
+index 827fa4d..d3d83c6 100644
+--- a/node_modules/react-native-safe-area-context/ios/Fabric/RNCSafeAreaViewComponentView.mm
++++ b/node_modules/react-native-safe-area-context/ios/Fabric/RNCSafeAreaViewComponentView.mm
+@@ -93,7 +93,9 @@ - (void)safeAreaProviderInsetsDidChange:(NSNotification *)notification
+ 
+ - (void)updateStateIfNecessary
+ {
+-  if (_providerView == nil) {
++  // Without state there is nowhere to apply the insets yet. Don't record them as applied, or the
++  // update is lost: once state arrives the insets compare equal and are never sent to layout.
++  if (_providerView == nil || !_state) {
+     return;
+   }
+ #if TARGET_OS_IPHONE
+@@ -149,6 +151,8 @@ + (ComponentDescriptorProvider)componentDescriptorProvider
+ - (void)updateState:(State::Shared const &)state oldState:(State::Shared const &)oldState
+ {
+   _state = std::static_pointer_cast<RNCSafeAreaViewShadowNode::ConcreteState const>(state);
++  // State can arrive after the view is already in a window with its final insets.
++  [self updateStateIfNecessary];
+ }
+ 
+ - (void)finalizeUpdates:(RNComponentViewUpdateMask)updateMask

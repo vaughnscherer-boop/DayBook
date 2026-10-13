@@ -9,22 +9,24 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-    accent: '#208AEF',
-    danger: '#E5484D',
+    text: '#161616',
+    background: '#ECEAE5', // warm light grey
+    backgroundElement: '#F7F6F3', // raised surfaces: inputs, popovers, sheets
+    backgroundSelected: '#D6D3CC', // hairlines and outlines
+    textSecondary: '#6E6B66',
+    accent: '#161616', // selection is solid black, like the pill toggles
+    onAccent: '#FFFFFF',
+    danger: '#E2583B',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-    accent: '#3D9BF5',
-    danger: '#FF6369',
+    text: '#F2F0EB',
+    background: '#121212',
+    backgroundElement: '#1E1E1E',
+    backgroundSelected: '#353432',
+    textSecondary: '#9A968F',
+    accent: '#F2F0EB',
+    onAccent: '#121212',
+    danger: '#F07052',
   },
 } as const;
 
@@ -68,16 +70,16 @@ export const Spacing = {
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
 
-/** Swatches for calendars and events. Vivid enough for white text, readable on light and dark. */
+/** Swatches for calendars and events: bold color blocks that carry their own text. */
 export const EventColors = [
-  '#1A8CFF', // blue
-  '#FF9500', // orange
-  '#FF3B30', // red
-  '#34C759', // green
-  '#AF52DE', // purple
-  '#FF2D55', // pink
-  '#E6B800', // yellow
-  '#30B0C7', // teal
-  '#5856D6', // indigo
-  '#A2845E', // brown
+  '#959BDB', // periwinkle
+  '#E2583B', // vermilion
+  '#8C4A4C', // maroon
+  '#9CC27A', // sage
+  '#1E3550', // navy
+  '#2B8899', // teal
+  '#D2BF45', // mustard
+  '#3B3B3B', // charcoal
+  '#C98A5A', // clay
+  '#7A5C99', // plum
 ] as const;

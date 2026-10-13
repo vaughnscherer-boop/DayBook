@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { TaskCheck } from '@/components/ui/task-check';
 import { Spacing } from '@/constants/theme';
 import type { CalendarItem } from '@/lib/calendar-items';
 import { formatDateKey, formatTime } from '@/lib/dates';
@@ -17,9 +18,7 @@ export function DayItemRow({ item, day, onOpen, onToggle }: Props) {
   return (
     <Pressable onPress={onOpen} style={styles.row}>
       {item.kind === 'task' ? (
-        <Pressable onPress={onToggle} hitSlop={8} accessibilityRole="checkbox" accessibilityState={{ checked: item.done }}>
-          <ThemedText style={[styles.check, { color: item.color }]}>{item.done ? '☑' : '☐'}</ThemedText>
-        </Pressable>
+        <TaskCheck done={item.done} color={item.color} onToggle={onToggle} />
       ) : (
         <View style={[styles.bar, { backgroundColor: item.color }]} />
       )}

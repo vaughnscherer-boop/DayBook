@@ -13,6 +13,7 @@ import { SyllabusDetails } from '@/components/syllabus-details';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TypeChips } from '@/components/type-chips';
+import { TaskCheck } from '@/components/ui/task-check';
 import { Spacing } from '@/constants/theme';
 import { listCalendars, type Calendar } from '@/db/calendars';
 import { learnFromPlacement, listGroups, type Group, type GroupChoice } from '@/db/groups';
@@ -229,9 +230,7 @@ export default function TaskScreen() {
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <ThemedView type="backgroundElement" style={[styles.group, styles.titleRow]}>
-          <Pressable onPress={() => setDone(!done)} hitSlop={8} accessibilityRole="checkbox" accessibilityState={{ checked: done }}>
-            <ThemedText style={[styles.check, { color: color ?? groupColor ?? calendarColor }]}>{done ? '☑' : '☐'}</ThemedText>
-          </Pressable>
+          <TaskCheck done={done} color={color ?? groupColor ?? calendarColor} size={24} onToggle={() => setDone(!done)} />
           <TextInput
             value={title}
             onChangeText={setTitle}

@@ -7,6 +7,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { CalendarChips } from '@/components/calendar-chips';
 import { ImportCourseCard } from '@/components/import-course-card';
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
 import { EventColors, Spacing } from '@/constants/theme';
 import { createCalendar, listCalendars, type Calendar } from '@/db/calendars';
@@ -146,11 +147,7 @@ export default function ImportScreen() {
             Pick a PDF or a screenshot. Daybook reads your class times, exams, homework and breaks, and you choose what to
             add before anything changes.
           </ThemedText>
-          <Pressable onPress={pick} style={[styles.primary, { backgroundColor: theme.accent }]}>
-            <ThemedText type="smallBold" style={styles.primaryText}>
-              Choose file…
-            </ThemedText>
-          </Pressable>
+          <Button title="Choose file…" onPress={pick} />
           {step.error && (
             <ThemedText type="small" style={{ color: theme.danger }}>
               {step.error}
@@ -229,25 +226,23 @@ export default function ImportScreen() {
             ))}
           </ScrollView>
           <ThemedView style={[styles.footer, { borderColor: theme.backgroundSelected }]}>
-            <Pressable
+            <Button
               onPress={save}
-              disabled={!canSave}
-              style={[styles.primary, { backgroundColor: canSave || saving ? theme.accent : theme.backgroundSelected }]}>
-              <ThemedText type="smallBold" style={styles.primaryText}>
-                {saving
-                  ? 'Adding…'
-                  : needsSection
-                    ? `Pick your section for ${needsSection.code ?? needsSection.name}`
-                    : total === 0
+              disabled={!canSave && !saving}
+              busy={saving}
+              title={
+                needsSection
+                  ? `Pick your section for ${needsSection.code ?? needsSection.name}`
+                  : total === 0
                     ? 'Nothing selected'
                     : `Add ${[
                         counts.events && `${counts.events} event${counts.events === 1 ? '' : 's'}`,
                         counts.tasks && `${counts.tasks} task${counts.tasks === 1 ? '' : 's'}`,
                       ]
                         .filter(Boolean)
-                        .join(' and ')}`}
-              </ThemedText>
-            </Pressable>
+                        .join(' and ')}`
+              }
+            />
           </ThemedView>
         </>
       )}
@@ -259,8 +254,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
   block: { gap: Spacing.two },
-  primary: { borderRadius: 999, paddingVertical: Spacing.two + 2, alignItems: 'center' },
-  primaryText: { color: '#ffffff', fontSize: 16 },
   importRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Spacing.two, padding: Spacing.two },
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },

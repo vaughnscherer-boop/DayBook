@@ -1,10 +1,8 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
+import { Chip } from '@/components/ui/chip';
 import { Spacing } from '@/constants/theme';
 import type { Group } from '@/db/groups';
-import { useTheme } from '@/hooks/use-theme';
-import { textOn } from '@/lib/calendar-items';
 import { ITEM_TYPES, typeColor, type ItemType } from '@/lib/item-type';
 
 type Props = {
@@ -19,24 +17,9 @@ type Props = {
 
 /** Auto · Class · Exam / quiz · Assignment · Reading · Other, each in its shade of the group color. */
 export function TypeChips({ group, value, guessed, onChange }: Props) {
-  const theme = useTheme();
 
   const chip = (key: string, label: string, selected: boolean, color: string, onPress: () => void) => (
-    <Pressable
-      key={key}
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      style={[
-        styles.chip,
-        { borderColor: selected ? color : theme.backgroundSelected },
-        selected && { backgroundColor: color },
-      ]}>
-      <View style={[styles.dot, { backgroundColor: color }, selected && styles.dotOnColor]} />
-      <ThemedText type="small" style={selected ? { color: textOn(color) } : undefined}>
-        {label}
-      </ThemedText>
-    </Pressable>
+    <Chip key={key} label={label} selected={selected} color={color} dot onPress={onPress} />
   );
   const labelOf = (type: ItemType) => ITEM_TYPES.find((t) => t.type === type)?.label ?? type;
 
@@ -52,15 +35,4 @@ export function TypeChips({ group, value, guessed, onChange }: Props) {
 
 const styles = StyleSheet.create({
   row: { gap: Spacing.two },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-  },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  dotOnColor: { borderWidth: 1, borderColor: '#ffffff' },
 });

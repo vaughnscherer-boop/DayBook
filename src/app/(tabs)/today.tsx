@@ -1,20 +1,25 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTabBarSpace } from '@/components/bottom-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { TaskCheck } from '@/components/ui/task-check';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/ui/icon';
+import { PressableScale } from '@/components/ui/pressable-scale';
 import { Spacing } from '@/constants/theme';
 import { moveTask, setOccurrenceDone, setTaskDone } from '@/db/tasks';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { useTheme } from '@/hooks/use-theme';
-import type { CalendarItem } from '@/lib/calendar-items';
+import { textOn, type CalendarItem } from '@/lib/calendar-items';
 import { briefRange, buildBrief, untilText, type TimelineEntry } from '@/lib/day-brief';
 import { formatDateKey, formatShortTime, fromKey, toDateKey } from '@/lib/dates';
 import { rescheduleAll } from '@/lib/notifications';
-
-const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
 const TYPE_LABEL: Partial<Record<CalendarItem['itemType'], string>> = { class: 'Class', exam: 'Test', reading: 'Reading' };
 
@@ -42,7 +47,10 @@ export default function TodayScreen() {
   const theme = useTheme();
   const { itemsBetween, reload } = useCalendarData();
   const params = useLocalSearchParams<{ date?: string }>();
-  const [now] = useState(() => new Date());
+  const tabBarSpace = useTabBarSpace();
+  // A tab stays mounted, so take a fresh "now" each time it's shown.
+  const [now, setNow] = useState(() => new Date());
+  useFocusEffect(useCallback(() => setNow(new Date()), []));
   const day = params.date ?? toDateKey(now);
 
   const [start, end] = briefRange(day);
@@ -75,7 +83,7 @@ export default function TodayScreen() {
     if (entry.kind === 'free') {
       return (
         <View key={`free-${i}`} style={styles.row}>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.time}>
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.time}>
             {formatShortTime(entry.start)}
           </ThemedText>
           <View style={[styles.freeBar, { borderColor: theme.backgroundSelected }]} />
@@ -86,40 +94,39 @@ export default function TodayScreen() {
       );
     }
     const { item } = entry;
+    const ink = textOn(item.color);
     const location = locationOf(item);
     const label = TYPE_LABEL[item.itemType];
     return (
-      <Pressable key={item.key} onPress={() => open(item)} style={styles.row}>
-        <ThemedText type="small" style={styles.time}>
-          {formatShortTime(item.startsAt!)}
-        </ThemedText>
-        <View style={[styles.bar, { backgroundColor: item.color }]} />
-        <View style={styles.flex}>
-          <ThemedText type="smallBold" numberOfLines={2}>
+      <PressableScale
+        key={item.key}
+        onPress={() => open(item)}
+        scaleTo={0.98}
+        style={[styles.eventCard, { backgroundColor: item.color }]}>
+        <View style={styles.eventTop}>
+          <ThemedText numberOfLines={2} style={[styles.eventTitle, { color: ink }]}>
             {item.title}
           </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
-            {[`until ${formatShortTime(item.endsAt!)}`, label, location].filter(Boolean).join(' · ')}
-          </ThemedText>
-          {item.details && (
-            <ThemedText type="small" themeColor="textSecondary" numberOfLines={3} style={styles.details}>
-              {item.details}
-            </ThemedText>
-          )}
+          <ThemedText style={[styles.eventTime, { color: ink }]}>{formatShortTime(item.startsAt!)}</ThemedText>
         </View>
-      </Pressable>
+        {item.details && (
+          <ThemedText type="small" numberOfLines={2} style={[styles.details, { color: ink, opacity: 0.8 }]}>
+            {item.details}
+          </ThemedText>
+        )}
+        <View style={styles.eventBottom}>
+          <Icon name={location ? 'location' : 'clock'} size={14} color={ink} />
+          <ThemedText type="smallBold" numberOfLines={1} style={[styles.flex, { color: ink }]}>
+            {[location, label, `until ${formatShortTime(item.endsAt!)}`].filter(Boolean).join(' · ')}
+          </ThemedText>
+        </View>
+      </PressableScale>
     );
   };
 
   const taskRow = (item: CalendarItem, actions?: 'stillOpen') => (
     <Pressable key={item.key} onPress={() => open(item)} style={styles.row}>
-      <Pressable
-        onPress={() => toggle(item)}
-        hitSlop={8}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: item.done }}>
-        <ThemedText style={[styles.check, { color: item.color }]}>{item.done ? '☑' : '☐'}</ThemedText>
-      </Pressable>
+      <TaskCheck done={item.done} color={item.color} size={22} onToggle={() => toggle(item)} />
       <View style={styles.flex}>
         <ThemedText
           type="smallBold"
@@ -158,42 +165,58 @@ export default function TodayScreen() {
   );
 
   const section = (title: string, children: ReactNode) => (
-    <ThemedView type="backgroundElement" style={styles.card}>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        {title.toUpperCase()}
-      </ThemedText>
+    <View style={styles.section}>
+      <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
       {children}
-    </ThemedView>
+    </View>
   );
 
-  const longDate = fromKey(day).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const date = fromKey(day);
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: isToday ? 'Today' : formatDateKey(day),
-          headerLeft: () => (
-            <Pressable onPress={close} hitSlop={8}>
-              <ThemedText style={{ color: theme.accent }}>Close</ThemedText>
-            </Pressable>
-          ),
-        }}
-      />
-      <ScrollView contentContainerStyle={styles.content}>
+      <SafeAreaView edges={['top']} style={styles.container}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarSpace + Spacing.three }]}>
         <View>
-          <ThemedText type="subtitle" style={styles.heading}>
-            {isToday ? greeting(now) : 'Your day'}
+          <ThemedText type="smallBold">{isToday ? greeting(now) : 'Your day'}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {isToday ? 'Have a great day!' : formatDateKey(day)}
           </ThemedText>
-          <ThemedText themeColor="textSecondary">{longDate}</ThemedText>
+        </View>
+
+        <View>
+          <ThemedText type="smallBold">{date.toLocaleDateString(undefined, { weekday: 'long' })}</ThemedText>
+          <View style={styles.dateRow}>
+            <View>
+              <ThemedText type="display">{date.getDate()}</ThemedText>
+              <ThemedText style={styles.month}>
+                {date.toLocaleDateString(undefined, { month: 'long' }).toUpperCase()}
+              </ThemedText>
+            </View>
+            <View style={[styles.divider, { backgroundColor: theme.backgroundSelected }]} />
+            <View style={styles.dateSide}>
+              <ThemedText style={styles.sideNumber}>
+                {isToday
+                  ? `${String(now.getHours()).padStart(2, '0')}.${String(now.getMinutes()).padStart(2, '0')}`
+                  : date.getFullYear()}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {isToday ? 'right now' : 'year'}
+              </ThemedText>
+            </View>
+          </View>
+          <View style={[styles.rule, { backgroundColor: theme.backgroundSelected }]} />
           <ThemedText style={styles.summary}>{brief.summary}</ThemedText>
         </View>
 
         {brief.allDay.length > 0 && (
           <View style={styles.chips}>
             {brief.allDay.map((item) => (
-              <Pressable key={item.key} onPress={() => open(item)} style={[styles.chip, { backgroundColor: item.color }]}>
-                <ThemedText type="small" style={styles.chipText}>
+              <Pressable
+                key={item.key}
+                onPress={() => open(item)}
+                style={[styles.chip, { backgroundColor: item.color }]}>
+                <ThemedText type="smallBold" style={{ color: textOn(item.color) }}>
                   {item.title}
                 </ThemedText>
               </Pressable>
@@ -204,9 +227,7 @@ export default function TodayScreen() {
         {section(
           'Your day',
           brief.timeline.length === 0 ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              No classes or events — the whole day is yours.
-            </ThemedText>
+            <EmptyState icon="sun" text="No classes or events — the whole day is yours." />
           ) : (
             brief.timeline.flatMap((entry, i) => [
               ...(i === nowIndex
@@ -227,9 +248,7 @@ export default function TodayScreen() {
         {section(
           'Due today',
           brief.dueToday.length === 0 ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              Nothing due today.
-            </ThemedText>
+            <EmptyState text="Nothing due today." />
           ) : (
             brief.dueToday.map((item) => taskRow(item))
           )
@@ -261,12 +280,9 @@ export default function TodayScreen() {
             ))
           )}
 
-        <Pressable
-          onPress={() => router.replace({ pathname: '/', params: { date: day } })}
-          style={[styles.primary, { backgroundColor: theme.accent }]}>
-          <ThemedText style={styles.primaryText}>Open calendar</ThemedText>
-        </Pressable>
+        <Button title="Open calendar" onPress={() => router.navigate({ pathname: '/calendar', params: { date: day } })} />
       </ScrollView>
+      </SafeAreaView>
     </ThemedView>
   );
 }
@@ -274,14 +290,24 @@ export default function TodayScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
-  heading: { fontSize: 28, lineHeight: 34 },
-  summary: { marginTop: Spacing.one },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, marginTop: Spacing.one },
+  month: { fontSize: 30, lineHeight: 34, fontWeight: 400, letterSpacing: 0.5 },
+  divider: { width: 1, alignSelf: 'stretch' },
+  dateSide: { gap: 2 },
+  sideNumber: { fontSize: 26, lineHeight: 30, fontWeight: 600, fontVariant: ['tabular-nums'] },
+  rule: { height: 1, marginTop: Spacing.three },
+  summary: { marginTop: Spacing.three },
+  eventCard: { borderRadius: 20, padding: Spacing.three + 2, gap: Spacing.three, minHeight: 116 },
+  eventTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
+  eventTitle: { flex: 1, fontSize: 22, lineHeight: 26, fontWeight: 800, letterSpacing: -0.4 },
+  eventTime: { fontSize: 15, fontWeight: 600, fontVariant: ['tabular-nums'] },
+  eventBottom: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, marginTop: 'auto' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chip: { borderRadius: 999, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one },
-  chipText: { color: '#ffffff' },
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
+  chip: { borderRadius: 999, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one + 2 },
+  section: { gap: Spacing.two + 4, marginTop: Spacing.two },
+  sectionTitle: { fontSize: 20, lineHeight: 24, fontWeight: 800, letterSpacing: -0.3 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
-  time: { width: 56 },
+  time: { width: 64, fontVariant: ['tabular-nums'] },
   bar: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
   freeBar: { width: 4, alignSelf: 'stretch', borderLeftWidth: 2, borderStyle: 'dashed' },
   nowRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
@@ -291,6 +317,4 @@ const styles = StyleSheet.create({
   details: { fontStyle: 'italic' },
   done: { textDecorationLine: 'line-through' },
   smallButton: { borderWidth: 1, borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: 2 },
-  primary: { borderRadius: 999, paddingVertical: Spacing.two + 2, alignItems: 'center' },
-  primaryText: { color: '#ffffff', fontSize: 16 },
 });
