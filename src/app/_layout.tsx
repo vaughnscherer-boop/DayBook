@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { DeviceCalendarSync } from '@/components/device-calendar-sync';
+import { GoogleSync } from '@/components/google-sync';
 import { NotificationSync } from '@/components/notification-sync';
 import { SyncProvider } from '@/components/sync-provider';
 import { Colors } from '@/constants/theme';
@@ -40,6 +41,7 @@ export default function RootLayout() {
           <NotificationSync />
           <SyncProvider />
           <DeviceCalendarSync />
+          <GoogleSync />
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="event/[id]" options={{ presentation: 'modal' }} />
@@ -53,6 +55,7 @@ export default function RootLayout() {
             <Stack.Screen name="tasks" options={{ title: 'Tasks', headerBackTitle: 'Home' }} />
             <Stack.Screen name="settings" options={{ presentation: 'modal', title: 'Settings' }} />
             <Stack.Screen name="group/[id]" options={{ presentation: 'modal', title: 'Edit class' }} />
+            <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
             <Stack.Screen
               name="onboarding"
               options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false }}

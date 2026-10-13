@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { signInWithGoogle } from '@/lib/google';
 import { supabase } from '@/lib/supabase';
 
 /** Supabase's sign-in errors in plain words. */
@@ -20,7 +21,7 @@ function friendly(message: string): string {
   return message;
 }
 
-/** Email + password sign-in or sign-up (Account screen and onboarding). Calls `onSignedIn` when done. */
+/** Google or email + password sign-in / sign-up (Account screen and onboarding). Calls `onSignedIn` when done. */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const theme = useTheme();
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
@@ -28,6 +29,19 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  // Signs in or creates the account in one step, and turns on Google Calendar access.
+  const google = async () => {
+    setGoogleBusy(true);
+    setMessage(null);
+    const result = await signInWithGoogle();
+    setGoogleBusy(false);
+    // On the web the page has gone to Google; it comes back to /auth-callback.
+    if (result.ok) {
+      if (Platform.OS !== 'web') onSignedIn();
+    } else if ('error' in result) setMessage({ text: friendly(result.error), error: true });
+  };
 
   const submit = async () => {
     if (!supabase || busy) return;
@@ -63,6 +77,10 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
       <ThemedText type="small" themeColor="textSecondary">
         Use the same account on your phone and computer to see one calendar everywhere. What’s already on this
         device is kept and added to your account.
+      </ThemedText>
+      <Button title="Continue with Google" variant="secondary" onPress={google} busy={googleBusy} />
+      <ThemedText type="caption" themeColor="textSecondary" style={styles.or}>
+        or use your email
       </ThemedText>
       <TextInput
         value={email}
@@ -108,5 +126,6 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 
 const styles = StyleSheet.create({
   card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
+  or: { textAlign: 'center' },
   input: { fontSize: 17, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: Spacing.two },
 });

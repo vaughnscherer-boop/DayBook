@@ -19,6 +19,8 @@ export const supabase: SupabaseClient | null =
           storage: localStorage,
           autoRefreshToken: true,
           persistSession: true,
+          // Google sign-in returns a one-time code that src/lib/google.ts swaps for the session.
+          flowType: 'pkce',
           detectSessionInUrl: false,
         },
       })

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <rect width="120" height="120" fill="#161616"/>
+  <!-- page -->
+  <rect x="24" y="30" width="72" height="66" rx="11" fill="#F2F0EB"/>
+  <!-- header band -->
+  <path d="M35 30h50a11 11 0 0 1 11 11v8H24v-8a11 11 0 0 1 11-11z" fill="#E2583B"/>
+  <!-- binding rings -->
+  <rect x="41" y="21" width="7" height="17" rx="3.5" fill="#F2F0EB" stroke="#161616" stroke-width="3"/>
+  <rect x="72" y="21" width="7" height="17" rx="3.5" fill="#F2F0EB" stroke="#161616" stroke-width="3"/>
+  <!-- days -->
+  <g fill="#D6D3CC">
+    <circle cx="37" cy="61" r="4"/><circle cx="52.3" cy="61" r="4"/><circle cx="67.7" cy="61" r="4"/><circle cx="83" cy="61" r="4"/>
+    <circle cx="37" cy="73" r="4"/><circle cx="52.3" cy="73" r="4"/><circle cx="83" cy="73" r="4"/>
+    <circle cx="37" cy="85" r="4"/><circle cx="52.3" cy="85" r="4"/>
+  </g>
+  <!-- today -->
+  <circle cx="67.7" cy="73" r="6" fill="#161616"/>
+</svg>

@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AccountSection } from '@/components/account-section';
 import { CalendarList } from '@/components/calendar-list';
+import { GoogleCalendars } from '@/components/google-calendars';
 import { NotificationSettings } from '@/components/notification-settings';
 import { PhoneCalendars } from '@/components/phone-calendars';
 import { ThemedText } from '@/components/themed-text';
@@ -36,6 +37,7 @@ export default function SettingsScreen() {
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         {section('CALENDARS', <CalendarList calendars={calendars} groups={groups} onChanged={changed} />)}
+        {section('GOOGLE CALENDAR', <GoogleCalendars calendars={calendars} />)}
         {deviceCalendarsAvailable &&
           section('PHONE CALENDARS', <PhoneCalendars calendars={calendars} onChanged={changed} />)}
         <AccountSection style={styles.section} />
