@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTabBarSpace } from '@/components/bottom-bar';
+import { ReminderLink } from '@/components/reminder-link';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TaskCheck } from '@/components/ui/task-check';
@@ -280,6 +281,7 @@ export default function TodayScreen() {
             ))
           )}
 
+        <ReminderLink kind="morning" />
         <Button title="Open calendar" onPress={() => router.navigate({ pathname: '/calendar', params: { date: day } })} />
       </ScrollView>
       </SafeAreaView>

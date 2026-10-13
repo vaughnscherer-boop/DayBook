@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const LATEST_VERSION = 10;
+const LATEST_VERSION = 12;
 
 /**
  * Creates/upgrades the database schema. Each time the schema changes, add a new
@@ -252,6 +252,48 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
       CREATE INDEX idx_device_event_links_event ON device_event_links (event_id);
     `);
     version = 10;
+  }
+
+  if (version < 11) {
+    // Sync no longer pauses the outbox triggers while applying cloud rows (see applyRecords), but
+    // while it did, phone-calendar events copied in at the same moment never got queued, so they
+    // stayed on the phone. Make sure the triggers are on, and queue every linked phone calendar and
+    // its events once. Each keeps its own updated_at, so a newer edit from another device still wins.
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    await db.execAsync(`
+      UPDATE sync_meta SET applying = 0;
+      INSERT OR IGNORE INTO sync_outbox (tbl, id, changed_at)
+        SELECT 'calendars', c.id, COALESCE(c.updated_at, ${now})
+        FROM calendars c JOIN device_calendar_links l ON l.calendar_id = c.id;
+      INSERT OR IGNORE INTO sync_outbox (tbl, id, changed_at)
+        SELECT 'events', e.id, COALESCE(e.updated_at, ${now})
+        FROM events e JOIN device_calendar_links l ON l.calendar_id = e.calendar_id;
+    `);
+    version = 11;
+  }
+
+  if (version < 12) {
+    // Reminder times and switches, synced so they can be changed from any device (the phone, which
+    // sends the reminders, follows). Other settings stay per-device in `settings`. Anything already
+    // chosen on this device moves over.
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const note = (row: 'NEW' | 'OLD') =>
+      `INSERT OR REPLACE INTO sync_outbox (tbl, id, changed_at) VALUES ('preferences', ${row}.name, ${now});`;
+    const when = 'WHEN (SELECT applying FROM sync_meta) = 0';
+    await db.execAsync(`
+      CREATE TABLE preferences (
+        name TEXT PRIMARY KEY NOT NULL,   -- morningTime, nightTime, morningEnabled, nightEnabled
+        value TEXT NOT NULL,              -- JSON
+        updated_at TEXT NOT NULL
+      );
+      CREATE TRIGGER sync_preferences_insert AFTER INSERT ON preferences ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_preferences_update AFTER UPDATE ON preferences ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_preferences_delete AFTER DELETE ON preferences ${when} BEGIN ${note('OLD')} END;
+      INSERT INTO preferences (name, value, updated_at)
+        SELECT key, value, ${now} FROM settings
+        WHERE key IN ('morningTime', 'nightTime', 'morningEnabled', 'nightEnabled');
+    `);
+    version = 12;
   }
 
   await db.execAsync(`PRAGMA user_version = ${version}`);

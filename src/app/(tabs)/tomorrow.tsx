@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTabBarSpace } from '@/components/bottom-bar';
 import { DayItemRow } from '@/components/day-item-row';
+import { ReminderLink } from '@/components/reminder-link';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
@@ -128,6 +129,7 @@ export default function TomorrowScreen() {
             </ThemedText>
             <ThemedText themeColor="textSecondary">{formatDateKey(day)}</ThemedText>
           </View>
+          <ReminderLink kind="night" />
 
           {already.length > 0 && (
             <View style={styles.block}>

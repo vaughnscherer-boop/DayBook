@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
+import { onDataChanged } from '@/lib/data-events';
 import {
   configureNotifications,
   ensurePermission,
@@ -19,8 +20,9 @@ function openFromNotification(notification: Notifications.Notification) {
 }
 
 /**
- * Keeps scheduled reminders in sync with the calendar (on launch and whenever the app
- * comes back to the foreground) and opens the right screen when a reminder is tapped.
+ * Keeps scheduled reminders in sync with the calendar (on launch, whenever the app comes back to
+ * the foreground, and when sync brings in changes, such as reminder times set on the computer) and
+ * opens the right screen when a reminder is tapped.
  */
 export function NotificationSync() {
   const db = useSQLiteContext();
@@ -32,6 +34,7 @@ export function NotificationSync() {
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') rescheduleAll(db);
     });
+    const stopSync = onDataChanged(() => rescheduleAll(db));
 
     // A tap that launched the app from closed, then any taps while it's running.
     const launchResponse = Notifications.getLastNotificationResponse();
@@ -45,6 +48,7 @@ export function NotificationSync() {
 
     return () => {
       appState.remove();
+      stopSync();
       taps.remove();
     };
   }, [db]);

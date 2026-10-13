@@ -20,11 +20,17 @@ export const DEFAULT_SETTINGS: Settings = {
   onboardingDone: false,
 };
 
+/** Reminder settings sync across devices (table `preferences`); the rest stay on this device. */
+const SYNCED: readonly (keyof Settings)[] = ['morningTime', 'nightTime', 'morningEnabled', 'nightEnabled'];
+
 /** Reads all settings, filling in defaults for anything never saved. Values are stored as JSON. */
 export async function getSettings(db: SQLiteDatabase): Promise<Settings> {
-  const rows = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM settings');
+  const [local, synced] = await Promise.all([
+    db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM settings'),
+    db.getAllAsync<{ key: string; value: string }>('SELECT name AS key, value FROM preferences'),
+  ]);
   const settings: Settings = { ...DEFAULT_SETTINGS };
-  for (const { key, value } of rows) {
+  for (const { key, value } of [...local.filter((row) => !SYNCED.includes(row.key as keyof Settings)), ...synced]) {
     if (key in settings) Object.assign(settings, { [key]: JSON.parse(value) });
   }
   return settings;
@@ -35,6 +41,16 @@ export async function setSetting<K extends keyof Settings>(
   key: K,
   value: Settings[K]
 ) {
+  if (SYNCED.includes(key)) {
+    await db.runAsync(
+      `INSERT INTO preferences (name, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(name) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      key,
+      JSON.stringify(value),
+      new Date().toISOString()
+    );
+    return;
+  }
   await db.runAsync(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
     key,

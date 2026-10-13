@@ -35,6 +35,7 @@ export function NotificationSettings() {
   const update = async <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
     await setSetting(db, key, value);
+    if (!notificationsSupported) return;
     if (value === true) setAllowed(await ensurePermission());
     rescheduleAll(db);
   };
@@ -51,17 +52,17 @@ export function NotificationSettings() {
     if (!sent) Alert.alert('Notifications are off', 'Turn them on in Settings to get reminders.');
   };
 
-  if (!notificationsSupported) {
-    return (
-      <ThemedText type="small" themeColor="textSecondary">
-        Morning and nightly reminders work in the phone app.
-      </ThemedText>
-    );
-  }
+  // The computer can't send notifications, but it can set the times: they sync to the phone.
+  const phone = notificationsSupported;
 
   return (
     <View style={styles.container}>
-      {!allowed && (
+      {!phone && (
+        <ThemedText type="small" themeColor="textSecondary">
+          Your phone sends these reminders. Times set here sync to it.
+        </ThemedText>
+      )}
+      {phone && !allowed && (
         <Pressable onPress={allow}>
           <ThemedView type="backgroundElement" style={styles.group}>
             <ThemedText>Notifications are off.</ThemedText>
@@ -77,7 +78,7 @@ export function NotificationSettings() {
         onToggle={(on) => update('morningEnabled', on)}
         time={settings.morningTime}
         onTimeChange={(time) => update('morningTime', time)}
-        onTest={() => test('morning')}
+        onTest={phone ? () => test('morning') : undefined}
       />
 
       <Section
@@ -87,7 +88,7 @@ export function NotificationSettings() {
         onToggle={(on) => update('nightEnabled', on)}
         time={settings.nightTime}
         onTimeChange={(time) => update('nightTime', time)}
-        onTest={() => test('night')}
+        onTest={phone ? () => test('night') : undefined}
       />
     </View>
   );
@@ -100,7 +101,8 @@ function Section(props: {
   onToggle: (on: boolean) => void;
   time: string;
   onTimeChange: (time: string) => void;
-  onTest: () => void;
+  /** Phone only: a test notification. */
+  onTest?: () => void;
 }) {
   const theme = useTheme();
   return (
@@ -122,11 +124,13 @@ function Section(props: {
           onChange={(date) => props.onTimeChange(dateToTime(date))}
         />
       )}
-      <Pressable onPress={props.onTest} hitSlop={8}>
-        <ThemedText type="small" style={{ color: theme.accent }}>
-          Send a test (arrives in 5 seconds)
-        </ThemedText>
-      </Pressable>
+      {props.onTest && (
+        <Pressable onPress={props.onTest} hitSlop={8}>
+          <ThemedText type="small" style={{ color: theme.accent }}>
+            Send a test (arrives in 5 seconds)
+          </ThemedText>
+        </Pressable>
+      )}
     </ThemedView>
   );
 }

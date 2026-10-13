@@ -35,6 +35,7 @@ const TABLES: Record<string, { key: string[]; changedColumn: string }> = {
   calendars: { key: ['id'], changedColumn: 'updated_at' },
   groups: { key: ['id'], changedColumn: 'updated_at' },
   events: { key: ['id'], changedColumn: 'updated_at' },
+  preferences: { key: ['name'], changedColumn: 'updated_at' },
   tasks: { key: ['id'], changedColumn: 'updated_at' },
   task_completions: { key: ['task_id', 'date'], changedColumn: 'completed_at' },
   imports: { key: ['id'], changedColumn: 'created_at' },
@@ -72,45 +73,49 @@ async function columnsOf(db: SyncDb): Promise<Record<string, Set<string>>> {
 /**
  * Writes cloud rows locally. Skips rows this device changed more recently (they're still waiting
  * to upload) and rows that are already identical. Returns how many rows actually changed.
+ *
+ * The outbox triggers note these writes like any other; each one's entry is removed right after, so
+ * it isn't sent straight back. (This used to switch the triggers off for the whole database while
+ * applying, which also silently dropped unrelated writes made meanwhile, such as the phone-calendar
+ * mirror copying in Apple Calendar events, so those never reached other devices.)
  */
 async function applyRecords(db: SyncDb, records: CloudRecord[], columns: Record<string, Set<string>>): Promise<number> {
   let changed = 0;
-  await db.runAsync('UPDATE sync_meta SET applying = 1');
-  try {
-    for (const record of records) {
-      const tbl = record.tbl;
-      // A table from a newer app version: nothing to put it in yet.
-      if (!TABLES[tbl]) continue;
-      const pending = await db.getFirstAsync<{ changed_at: string }>(
-        'SELECT changed_at FROM sync_outbox WHERE tbl = ? AND id = ?',
-        tbl,
-        record.id
-      );
-      if (pending && Date.parse(pending.changed_at) > Date.parse(record.changed_at)) continue;
-      if (pending) await db.runAsync('DELETE FROM sync_outbox WHERE tbl = ? AND id = ?', tbl, record.id);
+  const forget = (tbl: string, id: string) =>
+    db.runAsync('DELETE FROM sync_outbox WHERE tbl = ? AND id = ?', tbl, id);
+  for (const record of records) {
+    const tbl = record.tbl;
+    // A table from a newer app version: nothing to put it in yet.
+    if (!TABLES[tbl]) continue;
+    const pending = await db.getFirstAsync<{ changed_at: string }>(
+      'SELECT changed_at FROM sync_outbox WHERE tbl = ? AND id = ?',
+      tbl,
+      record.id
+    );
+    if (pending && Date.parse(pending.changed_at) > Date.parse(record.changed_at)) continue;
+    if (pending) await forget(tbl, record.id);
 
-      const where = keyWhere(tbl);
-      const values = keyValues(tbl, record.id);
-      const local = await db.getFirstAsync<Row>(`SELECT * FROM ${tbl} WHERE ${where}`, ...values);
-      if (record.deleted || !record.data) {
-        if (local) {
-          await db.runAsync(`DELETE FROM ${tbl} WHERE ${where}`, ...values);
-          changed++;
-        }
-        continue;
+    const where = keyWhere(tbl);
+    const values = keyValues(tbl, record.id);
+    const local = await db.getFirstAsync<Row>(`SELECT * FROM ${tbl} WHERE ${where}`, ...values);
+    if (record.deleted || !record.data) {
+      if (local) {
+        await db.runAsync(`DELETE FROM ${tbl} WHERE ${where}`, ...values);
+        await forget(tbl, record.id);
+        changed++;
       }
-      // Only the columns this version of the app knows; newer ones wait for an app update.
-      const data = record.data;
-      const names = Object.keys(data).filter((name) => columns[tbl].has(name));
-      if (local && names.every((name) => local[name] === data[name])) continue;
-      await db.runAsync(
-        `INSERT OR REPLACE INTO ${tbl} (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})`,
-        ...names.map((name) => data[name] as string | number | null)
-      );
-      changed++;
+      continue;
     }
-  } finally {
-    await db.runAsync('UPDATE sync_meta SET applying = 0');
+    // Only the columns this version of the app knows; newer ones wait for an app update.
+    const data = record.data;
+    const names = Object.keys(data).filter((name) => columns[tbl].has(name));
+    if (local && names.every((name) => local[name] === data[name])) continue;
+    await db.runAsync(
+      `INSERT OR REPLACE INTO ${tbl} (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})`,
+      ...names.map((name) => data[name] as string | number | null)
+    );
+    await forget(tbl, record.id);
+    changed++;
   }
   return changed;
 }
