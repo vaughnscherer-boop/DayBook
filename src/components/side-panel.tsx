@@ -1,20 +1,29 @@
+import { router } from 'expo-router';
 import { useMemo, useState, type Ref } from 'react';
-import { ScrollView, StyleSheet, View, type TextInput } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, type TextInput } from 'react-native';
 import { Calendar as MiniMonth } from 'react-native-calendars';
 
+import { AccountSection } from '@/components/account-section';
 import { AddBox, type NewEntry } from '@/components/add-box';
 import { CalendarList } from '@/components/calendar-list';
 import { DayAgenda } from '@/components/day-agenda';
 import { NotificationSettings } from '@/components/notification-settings';
+import { PhoneCalendars } from '@/components/phone-calendars';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import type { Calendar } from '@/db/calendars';
+import type { Group } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
 import { itemsOnDay, type CalendarItem } from '@/lib/calendar-items';
+import type { ClassInfo } from '@/lib/class-schedule';
 import { fromKey, monthGrid } from '@/lib/dates';
+import { deviceCalendarsAvailable } from '@/lib/device-calendars';
 
 type Props = {
   calendars: Calendar[];
+  groups: Group[];
+  /** Your classes, for "due next class" in the add box. */
+  classes: ClassInfo[];
   focusedDate: string;
   /** Calendar chosen in the add box (remembered between launches). */
   calendarId: string | null;
@@ -74,6 +83,7 @@ export function SidePanel(props: Props) {
         calendars={props.calendars}
         referenceDay={fromKey(props.focusedDate)}
         calendarId={props.calendarId}
+        classes={props.classes}
         onCalendarChange={props.onCalendarChange}
         onAdd={props.onAdd}
         inputRef={props.inputRef}
@@ -106,14 +116,45 @@ export function SidePanel(props: Props) {
         <ThemedText type="smallBold" themeColor="textSecondary">
           CALENDARS
         </ThemedText>
-        <CalendarList calendars={props.calendars} onChanged={props.onChanged} />
+        <CalendarList calendars={props.calendars} groups={props.groups} onChanged={props.onChanged} />
+        <Pressable onPress={() => router.push('/today')} style={styles.importRow}>
+          <ThemedText type="small" style={{ color: theme.accent }}>
+            Today’s brief…
+          </ThemedText>
+        </Pressable>
+        <Pressable onPress={() => router.push('/tomorrow')} style={styles.importRow}>
+          <ThemedText type="small" style={{ color: theme.accent }}>
+            Plan tomorrow…
+          </ThemedText>
+        </Pressable>
+        <Pressable onPress={() => router.push('/import')} style={styles.importRow}>
+          <ThemedText type="small" style={{ color: theme.accent }}>
+            Import syllabus or schedule…
+          </ThemedText>
+        </Pressable>
       </View>
+
+      {deviceCalendarsAvailable && (
+        <View style={styles.section}>
+          <ThemedText type="smallBold" themeColor="textSecondary">
+            PHONE CALENDARS
+          </ThemedText>
+          <PhoneCalendars calendars={props.calendars} onChanged={props.onChanged} />
+        </View>
+      )}
+
+      <AccountSection style={styles.section} />
 
       <View style={styles.section}>
         <ThemedText type="smallBold" themeColor="textSecondary">
           REMINDERS
         </ThemedText>
         <NotificationSettings />
+        <Pressable onPress={() => router.push('/onboarding')} style={styles.importRow}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Show intro again
+          </ThemedText>
+        </Pressable>
       </View>
     </ScrollView>
   );
@@ -124,4 +165,5 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.three, gap: Spacing.four },
   miniMonth: { paddingLeft: 0, paddingRight: 0, marginBottom: Spacing.two },
   section: { gap: Spacing.two },
+  importRow: { paddingVertical: Spacing.one },
 });

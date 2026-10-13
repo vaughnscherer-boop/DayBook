@@ -7,11 +7,15 @@ import { CalendarChips } from '@/components/calendar-chips';
 import { useChoiceDialog } from '@/components/choice-dialog';
 import { ColorSwatches } from '@/components/color-swatches';
 import { DateTimeField } from '@/components/date-time-field';
+import { GroupChips } from '@/components/group-chips';
 import { RepeatPicker } from '@/components/repeat-picker';
+import { SyllabusDetails } from '@/components/syllabus-details';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { TypeChips } from '@/components/type-chips';
 import { Spacing } from '@/constants/theme';
 import { listCalendars, type Calendar } from '@/db/calendars';
+import { learnFromPlacement, listGroups, type Group, type GroupChoice } from '@/db/groups';
 import {
   addTaskException,
   createTask,
@@ -25,6 +29,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive, notify } from '@/lib/confirm';
 import { dateToTime, daysBetween, fromKey, shiftKey, toDateKey } from '@/lib/dates';
+import { detectItemType, isCourseGroup, typeColor, type ItemType } from '@/lib/item-type';
 import { rescheduleAll } from '@/lib/notifications';
 import { parseRule, type RepeatRule } from '@/lib/recurrence';
 
@@ -52,6 +57,15 @@ export default function TaskScreen() {
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [calendarId, setCalendarId] = useState<string | null>(null);
   const [color, setColor] = useState<string | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
+  // The group the automatic rules gave this task, and whether you picked one by hand this time.
+  const [autoGroupId, setAutoGroupId] = useState<string | null>(null);
+  const [groupChoice, setGroupChoice] = useState<GroupChoice>('auto');
+  const [groupTouched, setGroupTouched] = useState(false);
+  // Class, exam, assignment...; null = guessed from the title.
+  const [itemType, setItemType] = useState<ItemType | null>(null);
+  // What an imported syllabus says about it (read-only).
+  const [details, setDetails] = useState<string | null>(null);
   const [repeat, setRepeat] = useState<RepeatRule | null>(null);
   const [repeatUntil, setRepeatUntil] = useState<string | null>(null);
   // For repeating tasks: when the series starts, and which date is being edited.
@@ -62,6 +76,7 @@ export default function TaskScreen() {
       setCalendars(list);
       setCalendarId((current) => current ?? list.find((c) => c.is_default)?.id ?? list[0]?.id ?? null);
     });
+    listGroups(db).then(setGroups);
     if (isNew) return;
     Promise.all([getTask(db, id), listCompletions(db)]).then(([task, completions]) => {
       if (!task) return;
@@ -75,6 +90,10 @@ export default function TaskScreen() {
       setDone(rule ? completions.some((c) => c.task_id === id && c.date === occurrence) : task.done === 1);
       setCalendarId(task.calendar_id);
       setColor(task.color);
+      if (task.group_locked) setGroupChoice({ groupId: task.group_id });
+      else setAutoGroupId(task.group_id);
+      setItemType(task.item_type);
+      setDetails(task.details);
       setRepeat(rule);
       setRepeatUntil(task.repeat_until);
       if (rule) setSeries({ start: task.date, occurrence });
@@ -95,8 +114,15 @@ export default function TaskScreen() {
       color,
       repeat,
       repeat_until: repeat ? repeatUntil : null,
+      // Keep a hand-picked group (also on a copy split off a series); 'auto' unless you chose one.
+      group: groupTouched || groupChoice !== 'auto' ? groupChoice : undefined,
+      item_type: itemType,
     };
-    const finish = () => {
+    const finish = async () => {
+      // Putting a task in a group by hand teaches that group its first word.
+      if (groupTouched && groupChoice !== 'auto' && groupChoice.groupId) {
+        await learnFromPlacement(db, groupChoice.groupId, title);
+      }
       rescheduleAll(db);
       router.back();
     };
@@ -165,6 +191,22 @@ export default function TaskScreen() {
   };
 
   const calendarColor = calendars.find((c) => c.id === calendarId)?.color ?? theme.accent;
+  const calendarGroups = groups.filter((group) => group.calendar_id === calendarId);
+  const autoGroup = calendarGroups.find((group) => group.id === autoGroupId) ?? null;
+  const shownGroupId = groupChoice === 'auto' ? autoGroup?.id : groupChoice.groupId;
+  const shownGroup = calendarGroups.find((group) => group.id === shownGroupId) ?? null;
+  // In a group, each type (class, exam, homework...) gets its own shade of the group's color.
+  const guessedType = detectItemType(title, 'task', repeat !== null, !!shownGroup && isCourseGroup(shownGroup));
+  const groupColor = shownGroup ? typeColor(shownGroup, itemType ?? guessedType) : null;
+  const changeCalendar = (next: string) => {
+    setCalendarId(next);
+    // A group belongs to one calendar; a hand-picked one from the old calendar no longer fits.
+    if (groupChoice !== 'auto' && groupChoice.groupId) setGroupChoice('auto');
+  };
+  const changeGroup = (choice: GroupChoice) => {
+    setGroupChoice(choice);
+    setGroupTouched(true);
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -188,7 +230,7 @@ export default function TaskScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <ThemedView type="backgroundElement" style={[styles.group, styles.titleRow]}>
           <Pressable onPress={() => setDone(!done)} hitSlop={8} accessibilityRole="checkbox" accessibilityState={{ checked: done }}>
-            <ThemedText style={[styles.check, { color: calendarColor }]}>{done ? '☑' : '☐'}</ThemedText>
+            <ThemedText style={[styles.check, { color: color ?? groupColor ?? calendarColor }]}>{done ? '☑' : '☐'}</ThemedText>
           </Pressable>
           <TextInput
             value={title}
@@ -199,6 +241,14 @@ export default function TaskScreen() {
             style={[styles.input, styles.titleInput, { color: theme.text }, done && styles.done]}
           />
         </ThemedView>
+
+        {details && (
+          <SyllabusDetails
+            details={details}
+            course={shownGroup?.name ?? null}
+            color={color ?? groupColor ?? calendarColor}
+          />
+        )}
 
         <ThemedView type="backgroundElement" style={styles.group}>
           <DateTimeField label="Date" value={day} onChange={setDay} mode="date" />
@@ -223,18 +273,32 @@ export default function TaskScreen() {
           <ThemedText type="small" themeColor="textSecondary">
             Calendar
           </ThemedText>
-          <CalendarChips calendars={calendars} value={calendarId} onChange={setCalendarId} />
+          <CalendarChips calendars={calendars} value={calendarId} onChange={changeCalendar} />
+          <ThemedText type="small" themeColor="textSecondary">
+            Group
+          </ThemedText>
+          <GroupChips groups={calendarGroups} value={groupChoice} autoGroup={autoGroup} onChange={changeGroup} />
+          {shownGroup && (
+            <>
+              <ThemedText type="small" themeColor="textSecondary">
+                Type
+              </ThemedText>
+              <TypeChips group={shownGroup} value={itemType} guessed={guessedType} onChange={setItemType} />
+            </>
+          )}
           <View style={styles.row}>
             <ThemedText type="small" themeColor="textSecondary">
               Color
             </ThemedText>
             <Pressable onPress={() => setColor(null)} hitSlop={6}>
               <ThemedText type="small" style={{ color: color ? theme.accent : theme.textSecondary }}>
-                {color ? 'Use calendar color' : 'Using calendar color'}
+                {groupColor
+                  ? color ? 'Use group color' : 'Using group color'
+                  : color ? 'Use calendar color' : 'Using calendar color'}
               </ThemedText>
             </Pressable>
           </View>
-          <ColorSwatches value={color ?? calendarColor} onChange={setColor} />
+          <ColorSwatches value={color ?? groupColor ?? calendarColor} onChange={setColor} />
         </ThemedView>
 
         <ThemedView type="backgroundElement" style={styles.group}>

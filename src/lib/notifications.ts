@@ -52,8 +52,8 @@ export async function ensurePermission(): Promise<boolean> {
 function nightContent(): Notifications.NotificationContentInput {
   return {
     title: "What's on for tomorrow?",
-    body: 'Tap to add anything you need to do tomorrow.',
-    data: { url: '/?add=tomorrow' },
+    body: 'Tap to jot down what you need to do tomorrow — Daybook puts it on your calendar.',
+    data: { url: '/tomorrow' },
   };
 }
 
@@ -74,7 +74,7 @@ function morningContent(day: string, items: CalendarItem[]): Notifications.Notif
         ? 'Good morning'
         : `Good morning — ${lines.length} thing${lines.length === 1 ? '' : 's'} today`,
     body: lines.length > 0 ? lines.join('\n') : 'Nothing on the calendar today.',
-    data: { url: `/?date=${day}` },
+    data: { url: `/today?date=${day}` },
   };
 }
 

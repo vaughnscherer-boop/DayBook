@@ -8,7 +8,9 @@
     "scheme": "daybook",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.vaughnscherer.daybook",
+      "appleTeamId": "CJVU73XF2V"
     },
     "android": {
       "adaptiveIcon": {
@@ -42,7 +44,14 @@
         }
       ],
       "expo-sqlite",
-      "expo-notifications"
+      "./plugins/without-push-entitlement",
+      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Daybook shows your Apple and Google calendars and keeps them in sync with your Daybook events."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,6 +1,9 @@
 import { randomUUID } from 'expo-crypto';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import type { Group } from '@/db/groups';
+import { detectItemType, isCourseGroup, typeColor, type ItemType } from '@/lib/item-type';
+
 export type Calendar = {
   id: string;
   name: string;
@@ -53,7 +56,10 @@ export async function setDefaultCalendar(db: SQLiteDatabase, id: string) {
   await db.runAsync('UPDATE calendars SET is_default = (id = ?)', id);
 }
 
-/** Deletes a calendar; its events and tasks move to the default calendar. The default can't be deleted. */
+/**
+ * Deletes a calendar and its groups; its events and tasks move to the default calendar. The default
+ * can't be deleted.
+ */
 export async function deleteCalendar(db: SQLiteDatabase, id: string) {
   const fallback = await db.getFirstAsync<{ id: string }>(
     'SELECT id FROM calendars WHERE is_default = 1 AND id != ?',
@@ -61,16 +67,53 @@ export async function deleteCalendar(db: SQLiteDatabase, id: string) {
   );
   if (!fallback) return;
   await db.withTransactionAsync(async () => {
-    await db.runAsync('UPDATE events SET calendar_id = ? WHERE calendar_id = ?', fallback.id, id);
-    await db.runAsync('UPDATE tasks SET calendar_id = ? WHERE calendar_id = ?', fallback.id, id);
+    // Groups belong to one calendar; moved items get regrouped in their new calendar.
+    await db.runAsync(
+      'UPDATE events SET calendar_id = ?, group_id = NULL, group_locked = 0 WHERE calendar_id = ?',
+      fallback.id,
+      id
+    );
+    await db.runAsync(
+      'UPDATE tasks SET calendar_id = ?, group_id = NULL, group_locked = 0 WHERE calendar_id = ?',
+      fallback.id,
+      id
+    );
+    await db.runAsync('DELETE FROM groups WHERE calendar_id = ?', id);
     await db.runAsync('DELETE FROM calendars WHERE id = ?', id);
   });
 }
 
-/** An item's own color if it has one, otherwise its calendar's. */
+/** The item's type within its group: what you (or the import) set, else a guess from its title. */
+export function itemTypeOf(
+  item: { title: string; item_type: ItemType | null; repeat: string | null },
+  kind: 'event' | 'task',
+  group: Group | null | undefined
+): ItemType {
+  return item.item_type ?? detectItemType(item.title, kind, item.repeat !== null, !!group && isCourseGroup(group));
+}
+
+/**
+ * An item's own color if it has one, otherwise its group's shade for the item's type (Latin quizzes
+ * darker, Latin homework lighter...), otherwise its calendar's color.
+ */
 export function itemColor(
-  item: { color: string | null; calendar_id: string | null },
-  calendarsById: Record<string, Calendar>
+  item: {
+    title: string;
+    color: string | null;
+    calendar_id: string | null;
+    group_id: string | null;
+    item_type: ItemType | null;
+    repeat: string | null;
+  },
+  kind: 'event' | 'task',
+  calendarsById: Record<string, Calendar>,
+  groupsById: Record<string, Group> = {}
 ): string {
-  return item.color ?? (item.calendar_id && calendarsById[item.calendar_id]?.color) ?? '#8E8E93';
+  const group = item.group_id ? groupsById[item.group_id] : undefined;
+  return (
+    item.color ??
+    (group && typeColor(group, itemTypeOf(item, kind, group))) ??
+    (item.calendar_id && calendarsById[item.calendar_id]?.color) ??
+    '#8E8E93'
+  );
 }

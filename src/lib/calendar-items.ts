@@ -1,7 +1,9 @@
-import { itemColor, type Calendar } from '@/db/calendars';
+import { itemColor, itemTypeOf, type Calendar } from '@/db/calendars';
 import type { CalendarEvent } from '@/db/events';
+import type { Group } from '@/db/groups';
 import type { Task, TaskCompletion } from '@/db/tasks';
-import { daysBetween, shiftKey } from '@/lib/dates';
+import { daysBetween, shiftKey, toDateKey } from '@/lib/dates';
+import type { ItemType } from '@/lib/item-type';
 import { occurrences, parseRule } from '@/lib/recurrence';
 
 /** One occurrence of an event or task, flattened into what the month/week/day views draw. */
@@ -15,6 +17,14 @@ export type CalendarItem = {
   repeating: boolean;
   title: string;
   color: string;
+  groupId: string | null;
+  /** Class, exam, assignment… within its group (guessed from the title unless set). */
+  itemType: ItemType;
+  /** What an imported syllabus says about it. */
+  details: string | null;
+  notes: string | null;
+  /** The local day it was added to Daybook. */
+  createdDay: string;
   startDay: string; // 'YYYY-MM-DD'
   endDay: string; // later than startDay only for multi-day all-day events
   allDay: boolean; // all-day event, or task without a time
@@ -38,7 +48,7 @@ function datesInRange(
   return occurrences(startDay, rule, item.repeat_until, exceptions, rangeStart, rangeEnd, daysBetween(startDay, endDay));
 }
 
-type BuildOptions = { includeHidden?: boolean };
+type BuildOptions = { includeHidden?: boolean; groups?: Group[] };
 
 /**
  * Merges events and tasks into per-occurrence items for the dates [rangeStart, rangeEnd],
@@ -51,9 +61,10 @@ export function buildItems(
   calendars: Calendar[],
   rangeStart: string,
   rangeEnd: string,
-  { includeHidden = false }: BuildOptions = {}
+  { includeHidden = false, groups = [] }: BuildOptions = {}
 ): CalendarItem[] {
   const byId = Object.fromEntries(calendars.map((calendar) => [calendar.id, calendar]));
+  const groupsById = Object.fromEntries(groups.map((group) => [group.id, group]));
   const isVisible = (calendarId: string | null) =>
     includeHidden || !calendarId || byId[calendarId]?.visible !== 0;
   const completed = new Set(completions.map((c) => `${c.task_id}|${c.date}`));
@@ -64,6 +75,7 @@ export function buildItems(
     const allDay = event.all_day === 1;
     const seriesStart = event.starts_at.slice(0, 10);
     const seriesEnd = allDay ? event.ends_at.slice(0, 10) : seriesStart;
+    const eventType = itemTypeOf(event, 'event', event.group_id ? groupsById[event.group_id] : null);
     for (const date of datesInRange(event, seriesStart, seriesEnd, rangeStart, rangeEnd)) {
       const shift = daysBetween(seriesStart, date);
       const startsAt = shiftKey(event.starts_at, shift);
@@ -75,7 +87,12 @@ export function buildItems(
         occurrenceDate: date,
         repeating: event.repeat !== null,
         title: event.title,
-        color: itemColor(event, byId),
+        color: itemColor(event, 'event', byId, groupsById),
+        groupId: event.group_id,
+        itemType: eventType,
+        details: event.details,
+        notes: event.notes,
+        createdDay: toDateKey(new Date(event.created_at)),
         startDay: date,
         // Timed events that run past midnight still live on their start day.
         endDay: allDay ? endsAt.slice(0, 10) : date,
@@ -90,6 +107,7 @@ export function buildItems(
   for (const task of tasks) {
     if (!isVisible(task.calendar_id)) continue;
     const repeating = task.repeat !== null;
+    const taskType = itemTypeOf(task, 'task', task.group_id ? groupsById[task.group_id] : null);
     for (const date of datesInRange(task, task.date, task.date, rangeStart, rangeEnd)) {
       items.push({
         kind: 'task',
@@ -98,7 +116,12 @@ export function buildItems(
         occurrenceDate: date,
         repeating,
         title: task.title,
-        color: itemColor(task, byId),
+        color: itemColor(task, 'task', byId, groupsById),
+        groupId: task.group_id,
+        itemType: taskType,
+        details: task.details,
+        notes: task.notes,
+        createdDay: toDateKey(new Date(task.created_at)),
         startDay: date,
         endDay: date,
         allDay: !task.time,

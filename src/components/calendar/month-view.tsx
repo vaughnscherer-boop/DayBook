@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
 import { DayPopover, POPOVER_WIDTH } from '@/components/calendar/day-popover';
 import { ThemedText } from '@/components/themed-text';
@@ -25,7 +25,6 @@ type Props = {
 };
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const HOVER_DELAY = 350;
 
 type Popover = { day: string; row: number; col: number };
 
@@ -42,26 +41,12 @@ export function MonthView({ focusedDate, items, wide, onOpenDay, onOpenItem, onT
 
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [popover, setPopover] = useState<Popover | null>(null);
-  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const lineHeight = wide ? 18 : 15;
+  const lineHeight = wide ? 18 : 16;
   const dayNumberHeight = wide ? 26 : 22;
   const rowHeight = size.height / weeks.length;
   const cellWidth = size.width / 7;
   const capacity = Math.max(0, Math.floor((rowHeight - dayNumberHeight - 2) / lineHeight));
-
-  const clearHover = () => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    hoverTimer.current = null;
-  };
-  const hoverOpen = (next: Popover) => {
-    clearHover();
-    hoverTimer.current = setTimeout(() => setPopover(next), HOVER_DELAY);
-  };
-  const hoverClose = () => {
-    clearHover();
-    hoverTimer.current = setTimeout(() => setPopover(null), 150);
-  };
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -122,8 +107,6 @@ export function MonthView({ focusedDate, items, wide, onOpenDay, onOpenItem, onT
                       key={day}
                       onPress={() => onOpenDay(day)}
                       onLongPress={() => setPopover({ day, row, col })}
-                      onHoverIn={Platform.OS === 'web' ? () => hoverOpen({ day, row, col }) : undefined}
-                      onHoverOut={Platform.OS === 'web' ? hoverClose : undefined}
                       accessibilityLabel={`${day}, ${singles.length} items`}
                       style={[styles.cell, { borderColor: theme.backgroundSelected }]}>
                       <View style={[styles.dayNumberRow, { height: dayNumberHeight }]}>
@@ -143,7 +126,7 @@ export function MonthView({ focusedDate, items, wide, onOpenDay, onOpenItem, onT
                       {more > 0 && (
                         <ThemedText
                           themeColor="textSecondary"
-                          style={[styles.lineText, { lineHeight, fontSize: wide ? 12 : 10 }]}>
+                          style={[styles.lineText, fitText(wide ? 12 : 10), { lineHeight }]}>
                           +{more} more
                         </ThemedText>
                       )}
@@ -169,7 +152,7 @@ export function MonthView({ focusedDate, items, wide, onOpenDay, onOpenItem, onT
                       <View style={[styles.spanFill, { backgroundColor: item.color }]}>
                         <ThemedText
                           numberOfLines={1}
-                          style={[styles.lineText, { color: textOn(item.color), fontSize: wide ? 12 : 10 }]}>
+                          style={[styles.lineText, fitText(wide ? 12 : 10), { color: textOn(item.color) }]}>
                           {item.title}
                         </ThemedText>
                       </View>
@@ -181,9 +164,7 @@ export function MonthView({ focusedDate, items, wide, onOpenDay, onOpenItem, onT
 
         {popover && popoverStyle && (
           <>
-            {Platform.OS !== 'web' && (
-              <Pressable style={StyleSheet.absoluteFill} onPress={() => setPopover(null)} />
-            )}
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setPopover(null)} />
             <DayPopover
               day={popover.day}
               items={itemsOnDay(items, popover.day)}
@@ -198,8 +179,6 @@ export function MonthView({ focusedDate, items, wide, onOpenDay, onOpenItem, onT
                 setPopover(null);
                 onOpenDay(day);
               }}
-              onHoverIn={clearHover}
-              onHoverOut={hoverClose}
             />
           </>
         )}
@@ -208,6 +187,12 @@ export function MonthView({ focusedDate, items, wide, onOpenDay, onOpenItem, onT
   );
 }
 
+/**
+ * Font size with a line height that fits the short rows. Without it the text keeps ThemedText's
+ * 24px line height, which on iOS sits low in a 15px row and gets its bottom cut off.
+ */
+const fitText = (fontSize: number) => ({ fontSize, lineHeight: fontSize + 3 });
+
 /** One line inside a day box: a timed event, a single-day all-day event, or a task. */
 function ItemLine({ item, wide, height }: { item: CalendarItem; wide: boolean; height: number }) {
   const fontSize = wide ? 12 : 10;
@@ -215,7 +200,7 @@ function ItemLine({ item, wide, height }: { item: CalendarItem; wide: boolean; h
   if (item.kind === 'event' && item.allDay) {
     return (
       <View style={[styles.pill, { height: height - 2, backgroundColor: item.color }]}>
-        <ThemedText numberOfLines={1} style={[styles.lineText, { color: textOn(item.color), fontSize }]}>
+        <ThemedText numberOfLines={1} style={[styles.lineText, fitText(fontSize), { color: textOn(item.color) }]}>
           {item.title}
         </ThemedText>
       </View>
@@ -225,7 +210,7 @@ function ItemLine({ item, wide, height }: { item: CalendarItem; wide: boolean; h
   return (
     <View style={[styles.line, { height }]}>
       {item.kind === 'task' ? (
-        <ThemedText style={[styles.lineText, { color: item.color, fontSize: fontSize + 1 }]}>
+        <ThemedText style={[styles.lineText, fitText(fontSize + 1), { color: item.color }]}>
           {item.done ? '☑' : '☐'}
         </ThemedText>
       ) : (
@@ -234,11 +219,11 @@ function ItemLine({ item, wide, height }: { item: CalendarItem; wide: boolean; h
       <ThemedText
         numberOfLines={1}
         themeColor={item.done ? 'textSecondary' : 'text'}
-        style={[styles.lineText, styles.lineTitle, { fontSize }, item.done && styles.done]}>
+        style={[styles.lineText, styles.lineTitle, fitText(fontSize), item.done && styles.done]}>
         {item.title}
       </ThemedText>
       {wide && item.time && (
-        <ThemedText themeColor="textSecondary" style={[styles.lineText, { fontSize }]}>
+        <ThemedText themeColor="textSecondary" style={[styles.lineText, fitText(fontSize)]}>
           {formatShortTime(item.time)}
         </ThemedText>
       )}
@@ -271,7 +256,7 @@ const styles = StyleSheet.create({
   outside: { opacity: 0.5 },
   line: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   lineBar: { width: 3, height: '70%', borderRadius: 1.5 },
-  lineText: { fontWeight: '500' },
+  lineText: { fontWeight: '500', includeFontPadding: false },
   lineTitle: { flex: 1 },
   done: { textDecorationLine: 'line-through' },
   pill: { borderRadius: 3, justifyContent: 'center', paddingHorizontal: 3, marginBottom: 2 },

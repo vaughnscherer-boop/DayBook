@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# sample syllabi for testing the import (may contain personal info)
+test-syllabi/

@@ -8,18 +8,18 @@ import type { NewEntry } from '@/components/add-box';
 import { CalendarHeader, type CalendarViewMode } from '@/components/calendar/calendar-header';
 import { JumpToDate } from '@/components/calendar/jump-to-date';
 import { MonthView } from '@/components/calendar/month-view';
+import { PagedCalendar } from '@/components/calendar/paged-calendar';
 import { TimeGrid } from '@/components/calendar/time-grid';
-import { ZoomGestures } from '@/components/calendar/zoom-gestures';
 import { Drawer } from '@/components/drawer';
 import { SidePanel } from '@/components/side-panel';
 import { ThemedView } from '@/components/themed-view';
-import { createEvent } from '@/db/events';
 import { getSettings, setSetting } from '@/db/settings';
-import { createTask, setOccurrenceDone, setTaskDone } from '@/db/tasks';
+import { setOccurrenceDone, setTaskDone } from '@/db/tasks';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { useTheme } from '@/hooks/use-theme';
 import type { CalendarItem } from '@/lib/calendar-items';
-import { addDays, addMonths, fromKey, monthGrid, toDateKey, todayKey, tomorrowKey, weekDays } from '@/lib/dates';
+import { createFromParsed } from '@/lib/create-entry';
+import { addDays, addMonths, fromKey, monthGrid, toDateKey, todayKey, weekDays } from '@/lib/dates';
 import { rescheduleAll } from '@/lib/notifications';
 
 const WIDE_BREAKPOINT = 900;
@@ -48,7 +48,14 @@ function titleFor(view: CalendarViewMode, focusedDate: string, wide: boolean) {
   return `${start} – ${end}, ${last.getFullYear()}`;
 }
 
-/** First and last day the current view shows. */
+/** The focused date `pages` months/weeks/days away from `focusedDate`. */
+function shiftFocus(view: CalendarViewMode, focusedDate: string, pages: number): string {
+  const date = fromKey(focusedDate);
+  if (view === 'month') return toDateKey(addMonths(date, pages));
+  return toDateKey(addDays(date, view === 'week' ? 7 * pages : pages));
+}
+
+/** First and last day the view shows for `focusedDate`. */
 function visibleRange(view: CalendarViewMode, focusedDate: string): [string, string] {
   const date = fromKey(focusedDate);
   if (view === 'day') return [focusedDate, focusedDate];
@@ -58,6 +65,13 @@ function visibleRange(view: CalendarViewMode, focusedDate: string): [string, str
   }
   const weeks = monthGrid(date);
   return [weeks[0][0], weeks[weeks.length - 1][6]];
+}
+
+/** What a page is "about", so a page keeps its key as it slides from neighbour to centre. */
+function pageId(view: CalendarViewMode, focusedDate: string): string {
+  if (view === 'month') return focusedDate.slice(0, 7);
+  if (view === 'week') return weekDays(fromKey(focusedDate))[0];
+  return focusedDate;
 }
 
 /** Opens the editor on this occurrence (the date matters for repeating items). */
@@ -73,7 +87,7 @@ export default function CalendarScreen() {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const wide = width >= WIDE_BREAKPOINT;
-  const { itemsBetween, calendars, reload } = useCalendarData();
+  const { itemsBetween, calendars, groups, classes, reload } = useCalendarData();
   const inputRef = useRef<TextInput>(null);
 
   const [view, setView] = useState<CalendarViewMode>('month');
@@ -83,12 +97,18 @@ export default function CalendarScreen() {
   const [jumpOpen, setJumpOpen] = useState(false);
   const [calendarId, setCalendarId] = useState<string | null>(null);
 
-  const [rangeStart, rangeEnd] = visibleRange(view, focusedDate);
+  // Load the neighbouring pages too, so they already show their items while being dragged in.
+  const rangeStart = visibleRange(view, shiftFocus(view, focusedDate, -1))[0];
+  const rangeEnd = visibleRange(view, shiftFocus(view, focusedDate, 1))[1];
   const items = useMemo(() => itemsBetween(rangeStart, rangeEnd), [itemsBetween, rangeStart, rangeEnd]);
 
-  // The add box starts on the calendar you used last time, else the default one.
+  // The add box starts on the calendar you used last time, else the default one. First launch on
+  // this device shows the intro.
   useEffect(() => {
-    getSettings(db).then((settings) => setCalendarId(settings.lastCalendarId));
+    getSettings(db).then((settings) => {
+      setCalendarId(settings.lastCalendarId);
+      if (!settings.onboardingDone) router.push('/onboarding');
+    });
   }, [db]);
   const addCalendarId =
     calendars.find((c) => c.id === calendarId)?.id ?? calendars.find((c) => c.is_default)?.id ?? null;
@@ -102,36 +122,27 @@ export default function CalendarScreen() {
     else setDrawerOpen(true);
   };
 
-  // Notification taps arrive as `/?add=tomorrow` (night) or `/?date=YYYY-MM-DD` (morning).
+  // `/?date=YYYY-MM-DD` opens that day (after the night check-in, and older morning notifications).
+  // `/?add=tomorrow` came from night notifications scheduled before the check-in screen existed.
   const params = useLocalSearchParams<{ add?: string; date?: string }>();
-  const request = params.add === 'tomorrow' ? tomorrowKey() : params.date;
   const [handledRequest, setHandledRequest] = useState<string | undefined>(undefined);
-  if (request !== handledRequest) {
-    setHandledRequest(request);
-    if (request) {
-      setFocusedDate(request);
+  if (params.date !== handledRequest) {
+    setHandledRequest(params.date);
+    if (params.date) {
+      setFocusedDate(params.date);
       setView('day');
-      if (params.add === 'tomorrow') {
-        if (wide) setPanelDocked(true);
-        else setDrawerOpen(true);
-      }
     }
   }
   useEffect(() => {
     if (params.add === 'tomorrow') {
-      setTimeout(() => inputRef.current?.focus(), 450);
       router.setParams({ add: undefined });
+      router.push('/tomorrow');
     } else if (params.date) {
       router.setParams({ date: undefined });
     }
   }, [params.add, params.date]);
 
-  const step = (direction: 1 | -1) => {
-    const date = fromKey(focusedDate);
-    const next =
-      view === 'month' ? addMonths(date, direction) : addDays(date, view === 'week' ? 7 * direction : direction);
-    setFocusedDate(toDateKey(next));
-  };
+  const step = (direction: 1 | -1) => setFocusedDate(shiftFocus(view, focusedDate, direction));
   const zoom = (direction: 1 | -1) => {
     const index = ZOOM_ORDER.indexOf(view) + direction;
     if (index >= 0 && index < ZOOM_ORDER.length) setView(ZOOM_ORDER[index]);
@@ -142,26 +153,7 @@ export default function CalendarScreen() {
   };
 
   const add = async ({ kind, parsed, calendarId: chosen }: NewEntry) => {
-    if (kind === 'event') {
-      await createEvent(db, {
-        title: parsed.title,
-        starts_at: parsed.starts_at,
-        ends_at: parsed.ends_at,
-        all_day: parsed.allDay,
-        calendar_id: chosen,
-        repeat: parsed.repeat,
-        repeat_until: parsed.repeatUntil,
-      });
-    } else {
-      await createTask(db, {
-        title: parsed.title,
-        date: parsed.starts_at.slice(0, 10),
-        time: parsed.allDay ? null : parsed.starts_at.slice(11, 16),
-        calendar_id: chosen,
-        repeat: parsed.repeat,
-        repeat_until: parsed.repeatUntil,
-      });
-    }
+    await createFromParsed(db, kind, parsed, chosen);
     setFocusedDate(parsed.starts_at.slice(0, 10));
     setDrawerOpen(false);
     await reload();
@@ -179,6 +171,8 @@ export default function CalendarScreen() {
   const panel = (
     <SidePanel
       calendars={calendars}
+      groups={groups}
+      classes={classes}
       focusedDate={focusedDate}
       calendarId={addCalendarId}
       onCalendarChange={changeCalendar}
@@ -198,16 +192,23 @@ export default function CalendarScreen() {
   );
 
   const viewProps = { items, wide, onOpenItem: openItem, onToggleTask: toggleTask, onOpenDay: openDay };
-  const body =
-    view === 'month' ? (
-      <MonthView focusedDate={focusedDate} {...viewProps} />
+  const renderPage = (page: -1 | 0 | 1) => {
+    const date = shiftFocus(view, focusedDate, page);
+    return view === 'month' ? (
+      <MonthView focusedDate={date} {...viewProps} />
     ) : (
       <TimeGrid
-        days={view === 'week' ? weekDays(fromKey(focusedDate)) : [focusedDate]}
+        days={view === 'week' ? weekDays(fromKey(date)) : [date]}
         onCreateAt={(start) => router.push({ pathname: '/event/[id]', params: { id: 'new', start } })}
         {...viewProps}
       />
     );
+  };
+  const pageKeys = ([-1, 0, 1] as const).map((page) => `${view}-${pageId(view, shiftFocus(view, focusedDate, page))}`) as [
+    string,
+    string,
+    string,
+  ];
 
   return (
     <ThemedView style={styles.container}>
@@ -228,13 +229,18 @@ export default function CalendarScreen() {
             onTitlePress={() => setJumpOpen(true)}
             onTogglePanel={() => (wide ? setPanelDocked(!panelDocked) : openPanel())}
           />
-          <ZoomGestures
-            onZoomIn={() => zoom(1)}
-            onZoomOut={() => zoom(-1)}
-            onNext={() => step(1)}
-            onPrev={() => step(-1)}>
-            <View style={styles.body}>{body}</View>
-          </ZoomGestures>
+          <View style={styles.body}>
+            <PagedCalendar
+              axis={view === 'month' ? 'y' : 'x'}
+              pageKey={pageKeys[1]}
+              pageKeys={pageKeys}
+              renderPage={renderPage}
+              onZoomIn={() => zoom(1)}
+              onZoomOut={() => zoom(-1)}
+              onNext={() => step(1)}
+              onPrev={() => step(-1)}
+            />
+          </View>
         </View>
       </SafeAreaView>
 

@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const LATEST_VERSION = 4;
+const LATEST_VERSION = 10;
 
 /**
  * Creates/upgrades the database schema. Each time the schema changes, add a new
@@ -128,6 +128,130 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
       );
     `);
     version = 4;
+  }
+
+  if (version < 5) {
+    // Automatic groups inside each calendar (a class, a sport...). Items placed in a group by hand
+    // are locked so the automatic rules never move them.
+    await db.execAsync(`
+      CREATE TABLE groups (
+        id TEXT PRIMARY KEY NOT NULL,
+        calendar_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL,
+        keywords TEXT NOT NULL DEFAULT '[]', -- JSON array of lowercase words/phrases that mean this group
+        source TEXT NOT NULL DEFAULT 'auto',  -- 'auto' | 'user' (renamed/edited by you) | 'import'
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_groups_calendar ON groups (calendar_id);
+
+      ALTER TABLE events ADD COLUMN group_id TEXT;
+      ALTER TABLE events ADD COLUMN group_locked INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE tasks ADD COLUMN group_id TEXT;
+      ALTER TABLE tasks ADD COLUMN group_locked INTEGER NOT NULL DEFAULT 0;
+    `);
+    version = 5;
+  }
+
+  if (version < 6) {
+    // Imported syllabi/schedules, so an import can be undone in one go.
+    await db.execAsync(`
+      CREATE TABLE imports (
+        id TEXT PRIMARY KEY NOT NULL,
+        title TEXT NOT NULL,
+        file_name TEXT,
+        created_at TEXT NOT NULL
+      );
+      ALTER TABLE events ADD COLUMN import_id TEXT;
+      ALTER TABLE tasks ADD COLUMN import_id TEXT;
+      ALTER TABLE groups ADD COLUMN import_id TEXT; -- set only on groups the import created
+    `);
+    version = 6;
+  }
+
+  if (version < 7) {
+    // Each item's type within its group (class, exam, assignment...), drawn as a shade of the
+    // group's color. NULL = guess from the title. Groups can override the shade for each type.
+    await db.execAsync(`
+      ALTER TABLE events ADD COLUMN item_type TEXT;
+      ALTER TABLE tasks ADD COLUMN item_type TEXT;
+      ALTER TABLE groups ADD COLUMN type_shades TEXT NOT NULL DEFAULT '{}';
+    `);
+    version = 7;
+  }
+
+  if (version < 8) {
+    // Sync across devices. Triggers note every change to a synced table in sync_outbox (to upload),
+    // except changes that came from the cloud: those are applied with sync_meta.applying = 1.
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const tables: [table: string, id: (row: string) => string][] = [
+      ['calendars', (row) => `${row}.id`],
+      ['groups', (row) => `${row}.id`],
+      ['events', (row) => `${row}.id`],
+      ['tasks', (row) => `${row}.id`],
+      ['task_completions', (row) => `${row}.task_id || '|' || ${row}.date`],
+      ['imports', (row) => `${row}.id`],
+    ];
+    const triggers = tables.map(([table, id]) => {
+      const note = (row: 'NEW' | 'OLD') =>
+        `INSERT OR REPLACE INTO sync_outbox (tbl, id, changed_at) VALUES ('${table}', ${id(row)}, ${now});`;
+      const when = 'WHEN (SELECT applying FROM sync_meta) = 0';
+      return `
+        CREATE TRIGGER sync_${table}_insert AFTER INSERT ON ${table} ${when} BEGIN ${note('NEW')} END;
+        CREATE TRIGGER sync_${table}_update AFTER UPDATE ON ${table} ${when} BEGIN ${note('NEW')} END;
+        CREATE TRIGGER sync_${table}_delete AFTER DELETE ON ${table} ${when} BEGIN ${note('OLD')} END;`;
+    }).join('\n');
+    await db.execAsync(`
+      CREATE TABLE sync_outbox (
+        tbl TEXT NOT NULL,
+        id TEXT NOT NULL,
+        changed_at TEXT NOT NULL,   -- ISO time of this device's latest change to the row
+        PRIMARY KEY (tbl, id)
+      );
+      CREATE TABLE sync_meta (
+        only_row INTEGER PRIMARY KEY CHECK (only_row = 1),
+        applying INTEGER NOT NULL DEFAULT 0, -- 1 while writing rows that came from the cloud
+        user_id TEXT,                        -- account this device last synced with
+        cursor INTEGER NOT NULL DEFAULT 0,   -- pulled everything up to this server rev
+        last_synced_at TEXT
+      );
+      INSERT INTO sync_meta (only_row) VALUES (1);
+      ${triggers}
+    `);
+    version = 8;
+  }
+
+  if (version < 9) {
+    // What an imported syllabus says about an item (what to do, what it covers, weight...). Kept
+    // apart from your own notes; filled in by imports only.
+    await db.execAsync(`
+      ALTER TABLE events ADD COLUMN details TEXT;
+      ALTER TABLE tasks ADD COLUMN details TEXT;
+    `);
+    version = 9;
+  }
+
+  if (version < 10) {
+    // Links between Daybook and the phone's own calendars (iCloud, Google…), for two-way mirroring.
+    // Only meaningful on this phone, so these tables have no sync triggers.
+    await db.execAsync(`
+      CREATE TABLE device_calendar_links (
+        calendar_id TEXT PRIMARY KEY NOT NULL,  -- Daybook calendar
+        device_calendar_id TEXT NOT NULL,       -- the phone calendar it mirrors
+        origin TEXT NOT NULL                    -- 'device' (came from the phone) | 'daybook' (copied to the phone)
+      );
+      CREATE TABLE device_event_links (
+        event_id TEXT NOT NULL,                 -- Daybook event
+        device_event_id TEXT NOT NULL,          -- phone event (shared by every occurrence of a repeat)
+        occurrence TEXT NOT NULL,               -- that occurrence's original start ('YYYY-MM-DDTHH:MM'); '' = whole series
+        device_calendar_id TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,              -- both sides' content when last in agreement
+        PRIMARY KEY (device_event_id, occurrence)
+      );
+      CREATE INDEX idx_device_event_links_event ON device_event_links (event_id);
+    `);
+    version = 10;
   }
 
   await db.execAsync(`PRAGMA user_version = ${version}`);

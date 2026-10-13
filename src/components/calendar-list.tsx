@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ColorSwatches } from '@/components/color-swatches';
+import { GroupList } from '@/components/group-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { EventColors, Spacing } from '@/constants/theme';
@@ -13,13 +14,17 @@ import {
   updateCalendar,
   type Calendar,
 } from '@/db/calendars';
+import type { Group } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/confirm';
 
-type Props = { calendars: Calendar[]; onChanged: () => void };
+type Props = { calendars: Calendar[]; groups: Group[]; onChanged: () => void };
 
-/** Calendars with show/hide checkboxes; tap a row to edit its color, name, default, or delete it. */
-export function CalendarList({ calendars, onChanged }: Props) {
+/**
+ * Calendars with show/hide checkboxes, each with its automatic groups underneath; tap a row to edit
+ * its color, name, default, or delete it.
+ */
+export function CalendarList({ calendars, groups, onChanged }: Props) {
   const db = useSQLiteContext();
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -39,27 +44,29 @@ export function CalendarList({ calendars, onChanged }: Props) {
   return (
     <View style={styles.container}>
       {calendars.map((calendar) => (
-        <CalendarRow
-          key={calendar.id}
-          calendar={calendar}
-          editing={editing === calendar.id}
-          onToggleEdit={() => setEditing(editing === calendar.id ? null : calendar.id)}
-          onToggleVisible={() => change(updateCalendar(db, calendar.id, { visible: !calendar.visible }))}
-          onColor={(color) => change(updateCalendar(db, calendar.id, { color }))}
-          onRename={(name) => name.trim() && change(updateCalendar(db, calendar.id, { name }))}
-          onMakeDefault={() => change(setDefaultCalendar(db, calendar.id))}
-          onDelete={() =>
-            confirmDestructive(
-              `Delete “${calendar.name}”?`,
-              'Its events and tasks move to your default calendar.',
-              'Delete',
-              () => {
-                setEditing(null);
-                change(deleteCalendar(db, calendar.id));
-              }
-            )
-          }
-        />
+        <View key={calendar.id}>
+          <CalendarRow
+            calendar={calendar}
+            editing={editing === calendar.id}
+            onToggleEdit={() => setEditing(editing === calendar.id ? null : calendar.id)}
+            onToggleVisible={() => change(updateCalendar(db, calendar.id, { visible: !calendar.visible }))}
+            onColor={(color) => change(updateCalendar(db, calendar.id, { color }))}
+            onRename={(name) => name.trim() && change(updateCalendar(db, calendar.id, { name }))}
+            onMakeDefault={() => change(setDefaultCalendar(db, calendar.id))}
+            onDelete={() =>
+              confirmDestructive(
+                `Delete “${calendar.name}”?`,
+                'Its events and tasks move to your default calendar.',
+                'Delete',
+                () => {
+                  setEditing(null);
+                  change(deleteCalendar(db, calendar.id));
+                }
+              )
+            }
+          />
+          <GroupList groups={groups.filter((group) => group.calendar_id === calendar.id)} onChanged={onChanged} />
+        </View>
       ))}
       <Pressable onPress={addCalendar} style={styles.addRow}>
         <ThemedText type="small" themeColor="textSecondary">

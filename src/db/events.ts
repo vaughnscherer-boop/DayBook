@@ -1,6 +1,8 @@
 import { randomUUID } from 'expo-crypto';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { groupColumns, setGroupColumns, type GroupChoice } from '@/db/groups';
+import type { ItemType } from '@/lib/item-type';
 import type { RepeatRule } from '@/lib/recurrence';
 
 export type CalendarEvent = {
@@ -16,6 +18,10 @@ export type CalendarEvent = {
   repeat: string | null; // JSON RepeatRule
   repeat_until: string | null;
   exceptions: string; // JSON array of skipped dates
+  group_id: string | null;
+  group_locked: 0 | 1; // 1 = placed by hand; automatic grouping leaves it alone
+  item_type: ItemType | null; // null = guessed from the title
+  details: string | null; // from an imported syllabus; read-only in the app
   created_at: string;
   updated_at: string;
 };
@@ -30,6 +36,10 @@ export type EventInput = {
   color?: string | null;
   repeat?: RepeatRule | null;
   repeat_until?: string | null;
+  /** Set when the group was picked by hand (or "no group"); leave out to keep the current one. */
+  group?: GroupChoice;
+  /** Class, exam, assignment...; null = guess from the title. Leave out to keep the current one. */
+  item_type?: ItemType | null;
 };
 
 export async function listEvents(db: SQLiteDatabase): Promise<CalendarEvent[]> {
@@ -42,11 +52,12 @@ export async function getEvent(db: SQLiteDatabase, id: string): Promise<Calendar
 
 export async function createEvent(db: SQLiteDatabase, input: EventInput): Promise<string> {
   const id = randomUUID();
+  const group = groupColumns(input.group);
   const now = new Date().toISOString();
   await db.runAsync(
     `INSERT INTO events (id, title, notes, starts_at, ends_at, all_day, calendar_id, color, repeat, repeat_until,
-       created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       group_id, group_locked, item_type, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     input.title.trim(),
     input.notes ?? null,
@@ -57,6 +68,9 @@ export async function createEvent(db: SQLiteDatabase, input: EventInput): Promis
     input.color ?? null,
     input.repeat ? JSON.stringify(input.repeat) : null,
     input.repeat_until ?? null,
+    group?.group_id ?? null,
+    group?.group_locked ?? 0,
+    input.item_type ?? null,
     now,
     now
   );
@@ -80,6 +94,10 @@ export async function updateEvent(db: SQLiteDatabase, id: string, input: EventIn
     new Date().toISOString(),
     id
   );
+  await setGroupColumns(db, 'events', id, input.group);
+  if (input.item_type !== undefined) {
+    await db.runAsync('UPDATE events SET item_type = ? WHERE id = ?', input.item_type, id);
+  }
 }
 
 export async function deleteEvent(db: SQLiteDatabase, id: string) {

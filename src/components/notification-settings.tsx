@@ -71,8 +71,8 @@ export function NotificationSettings() {
       )}
 
       <Section
-        title="Morning summary"
-        description="Everything on your calendar for the day."
+        title="Morning brief"
+        description="Your day at a glance. Tap it for the full brief: classes, free time, what’s due and tests coming up."
         enabled={settings.morningEnabled}
         onToggle={(on) => update('morningEnabled', on)}
         time={settings.morningTime}
@@ -82,7 +82,7 @@ export function NotificationSettings() {
 
       <Section
         title="Nightly check-in"
-        description="Asks what to add for tomorrow. Tap it to add things right away."
+        description="Asks what’s on for tomorrow. Tap it, list what you need to do, and Daybook puts it on your calendar."
         enabled={settings.nightEnabled}
         onToggle={(on) => update('nightEnabled', on)}
         time={settings.nightTime}

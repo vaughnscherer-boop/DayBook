@@ -6,6 +6,8 @@ export type Settings = {
   morningEnabled: boolean;
   nightEnabled: boolean;
   lastCalendarId: string | null; // calendar picked in the add box last time
+  deviceId: string | null; // random id sent with imports (the server's per-device daily limit)
+  onboardingDone: boolean; // the first-launch intro was finished or skipped on this device
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -14,6 +16,8 @@ export const DEFAULT_SETTINGS: Settings = {
   morningEnabled: true,
   nightEnabled: true,
   lastCalendarId: null,
+  deviceId: null,
+  onboardingDone: false,
 };
 
 /** Reads all settings, filling in defaults for anything never saved. Values are stored as JSON. */

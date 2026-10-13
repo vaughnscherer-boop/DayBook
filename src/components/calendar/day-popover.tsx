@@ -17,17 +17,15 @@ type Props = {
   onOpenItem: (item: CalendarItem) => void;
   onToggleTask: (item: CalendarItem) => void;
   onOpenDay: (day: string) => void;
-  onHoverIn?: () => void;
-  onHoverOut?: () => void;
 };
 
 export const POPOVER_WIDTH = 260;
 
-/** Floating card listing one day's events and tasks (hover on computer, long-press on phone). */
-export function DayPopover({ day, items, style, listMaxHeight = 260, onOpenItem, onToggleTask, onOpenDay, onHoverIn, onHoverOut }: Props) {
+/** Floating card listing one day's events and tasks (long-press a day in Month view). */
+export function DayPopover({ day, items, style, listMaxHeight = 260, onOpenItem, onToggleTask, onOpenDay }: Props) {
   const theme = useTheme();
   return (
-    <Pressable onHoverIn={onHoverIn} onHoverOut={onHoverOut} style={[styles.wrap, style]}>
+    <Pressable style={[styles.wrap, style]}>
       <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.backgroundSelected }]}>
         <View style={styles.header}>
           <ThemedText type="smallBold">{formatDateKey(day)}</ThemedText>
