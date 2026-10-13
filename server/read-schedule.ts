@@ -31,6 +31,7 @@ Dated items
 - presentation: student presentations.
 - event: other dated class events worth a calendar entry (field trips, guest lectures, lab practicals).
 - break: breaks and holidays (Fall Break, Thanksgiving Break, Reading Day) as one item each, using end_date for multi-day breaks.
+- Be exhaustive: every dated thing to do, read, submit or attend belongs in items, including every reading. Work that differs by section (each lab section's own homework and due dates, per-section peer reviews and presentations) gets one item per section with section set; never collapse sections into one item or leave a section's work out.
 - Skip lecture topics with nothing due, plain links, grading policy, and lists of other students' names.
 - details: everything the document says about that particular item, as 1–3 short plain sentences a student can act on: what to do (exercises, pages, length), what it covers (chapters, topics), format and duration, how much of the grade it's worth, and how or where to submit. Pull in descriptions from anywhere in the document (an assignments section, a grading table, exam descriptions) onto the matching dated item. Use null when the document says nothing beyond the title; never invent or generalize.
 - Titles: short and specific, as a student would write them in a planner: "Quiz 1 (Ch. 1–2)", "Ex. 16–20 & story, Ch. 1", "Read Ch. 1 (pp. 1–11)", "Problem Set 2", "Test 2". Don't repeat the course code in titles.
@@ -49,6 +50,10 @@ export async function readSchedule(input: {
   mediaType: string;
   fileName: string;
   today: string; // 'YYYY-MM-DD' on the student's device
+  /** How hard Claude thinks: 'medium' is faster (hosted functions have a time limit), 'high' more thorough. */
+  effort?: 'medium' | 'high';
+  /** Gives up (with a friendly error) when this fires. */
+  signal?: AbortSignal;
 }): Promise<{ schedule: ScheduleImport; costUsd: number }> {
   const kind = IMPORT_TYPES[input.mediaType];
   if (!kind) throw new ScheduleReadError('That file type isn’t supported — use a PDF, PNG, JPEG, GIF or WebP.');
@@ -76,7 +81,7 @@ export async function readSchedule(input: {
         // If a safety classifier declines, retry on Anthropic's recommended fallback model.
         fallbacks: 'default',
         thinking: { type: 'adaptive' },
-        output_config: { effort: 'high', format: { type: 'json_schema', schema: SCHEDULE_SCHEMA } },
+        output_config: { effort: input.effort ?? 'medium', format: { type: 'json_schema', schema: SCHEDULE_SCHEMA } },
         system: SYSTEM,
         messages: [
           {
@@ -87,9 +92,12 @@ export async function readSchedule(input: {
             ],
           },
         ],
-      })
+      }, { signal: input.signal })
       .finalMessage();
   } catch (error) {
+    if (error instanceof Anthropic.APIUserAbortError) {
+      throw new ScheduleReadError('That took too long to read — try a shorter document, or just the schedule pages.');
+    }
     if (error instanceof Anthropic.AuthenticationError) {
       throw new ScheduleReadError('The server’s Anthropic API key isn’t valid. Check ANTHROPIC_API_KEY in .env.local.');
     }

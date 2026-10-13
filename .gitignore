@@ -44,3 +44,6 @@ example
 
 # sample syllabi for testing the import (may contain personal info)
 test-syllabi/
+
+# Supabase CLI scratch files
+supabase/.temp/

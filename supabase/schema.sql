@@ -59,3 +59,15 @@ begin
   end if;
 end;
 $$;
+
+-- Syllabus imports read by the import-schedule function, for its per-account daily limit and to
+-- see what imports cost. Only the function (service role) reads or writes it: no policies.
+create table if not exists public.import_log (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  file_name  text,
+  cost_usd   numeric(8, 4),
+  created_at timestamptz not null default now()
+);
+create index if not exists import_log_user_time on public.import_log (user_id, created_at);
+alter table public.import_log enable row level security;
