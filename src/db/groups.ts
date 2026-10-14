@@ -171,6 +171,16 @@ export async function mergeGroups(db: SQLiteDatabase, fromId: string, intoId: st
   await db.withTransactionAsync(async () => {
     await db.runAsync('UPDATE events SET group_id = ? WHERE group_id = ?', intoId, fromId);
     await db.runAsync('UPDATE tasks SET group_id = ? WHERE group_id = ?', intoId, fromId);
+    // Its grade categories come along, unless the other class already has the same-named one.
+    await db.runAsync(
+      `UPDATE grade_categories SET group_id = ?, updated_at = ? WHERE group_id = ?
+         AND lower(name) NOT IN (SELECT lower(name) FROM grade_categories WHERE group_id = ?)`,
+      intoId,
+      new Date().toISOString(),
+      fromId,
+      intoId
+    );
+    await db.runAsync('DELETE FROM grade_categories WHERE group_id = ?', fromId);
     await db.runAsync(
       `UPDATE groups SET keywords = ?, source = 'user', updated_at = ? WHERE id = ?`,
       JSON.stringify(keywords),
@@ -189,6 +199,7 @@ export async function deleteGroup(db: SQLiteDatabase, id: string) {
   await db.withTransactionAsync(async () => {
     await db.runAsync('UPDATE events SET group_id = NULL, group_locked = 1 WHERE group_id = ?', id);
     await db.runAsync('UPDATE tasks SET group_id = NULL, group_locked = 1 WHERE group_id = ?', id);
+    await db.runAsync('DELETE FROM grade_categories WHERE group_id = ?', id);
     await db.runAsync('DELETE FROM groups WHERE id = ?', id);
   });
 }

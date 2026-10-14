@@ -36,6 +36,9 @@ Dated items
 - details: everything the document says about that particular item, as 1–3 short plain sentences a student can act on: what to do (exercises, pages, length), what it covers (chapters, topics), format and duration, how much of the grade it's worth, and how or where to submit. Pull in descriptions from anywhere in the document (an assignments section, a grading table, exam descriptions) onto the matching dated item. Use null when the document says nothing beyond the title; never invent or generalize.
 - Titles: short and specific, as a student would write them in a planner: "Quiz 1 (Ch. 1–2)", "Ex. 16–20 & story, Ch. 1", "Read Ch. 1 (pp. 1–11)", "Problem Set 2", "Test 2". Don't repeat the course code in titles.
 
+Grading
+- grading: the course's grade breakdown, one entry per weighted category, exactly as the document gives it ("Exams 40%", "Homework 25%", "Final 20%", "Participation 15%"). weight is the percent as a number. Merge a category listed in pieces (Midterm 1, Midterm 2) only if the document itself groups them; otherwise keep its lines. drop_lowest is how many of the lowest scores are dropped ("lowest quiz dropped" = 1), else null. [] if the document gives no weights; never invent them.
+
 Dates and times
 - Dates are YYYY-MM-DD. When the year is missing, use the term shown in the document; otherwise the school year containing today's date.
 - Times are 24-hour HH:MM. "0245PM" means 14:45; "8-8:55 a.m." means 08:00–08:55.

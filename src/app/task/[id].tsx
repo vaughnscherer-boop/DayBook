@@ -7,6 +7,7 @@ import { CalendarChips } from '@/components/calendar-chips';
 import { useChoiceDialog } from '@/components/choice-dialog';
 import { ColorSwatches } from '@/components/color-swatches';
 import { DateTimeField } from '@/components/date-time-field';
+import { ScoreField } from '@/components/course/score-field';
 import { GroupChips } from '@/components/group-chips';
 import { RepeatPicker } from '@/components/repeat-picker';
 import { SyllabusDetails } from '@/components/syllabus-details';
@@ -284,6 +285,9 @@ export default function TaskScreen() {
               </ThemedText>
               <TypeChips group={shownGroup} value={itemType} guessed={guessedType} onChange={setItemType} />
             </>
+          )}
+          {!isNew && shownGroup && !repeat && (itemType ?? guessedType) !== 'class' && (
+            <ScoreField table="tasks" id={id} groupId={shownGroup.id} />
           )}
           <View style={styles.row}>
             <ThemedText type="small" themeColor="textSecondary">

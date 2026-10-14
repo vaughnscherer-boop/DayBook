@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const LATEST_VERSION = 13;
+const LATEST_VERSION = 14;
 
 /**
  * Creates/upgrades the database schema. Each time the schema changes, add a new
@@ -325,6 +325,38 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
       ALTER TABLE groups ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
     `);
     version = 13;
+  }
+
+  if (version < 14) {
+    // Grades: weighted categories per course (Exams 40%, Homework 30%...) and a score on each
+    // exam/assignment. A NULL category_id means "pick by name/type" (see src/lib/grades.ts).
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const note = (row: 'NEW' | 'OLD') =>
+      `INSERT OR REPLACE INTO sync_outbox (tbl, id, changed_at) VALUES ('grade_categories', ${row}.id, ${now});`;
+    const when = 'WHEN (SELECT applying FROM sync_meta) = 0';
+    await db.execAsync(`
+      CREATE TABLE grade_categories (
+        id TEXT PRIMARY KEY NOT NULL,
+        group_id TEXT NOT NULL,       -- the course
+        name TEXT NOT NULL,
+        weight REAL NOT NULL,         -- percent of the course grade
+        drop_lowest INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_grade_categories_group ON grade_categories (group_id);
+      CREATE TRIGGER sync_grade_categories_insert AFTER INSERT ON grade_categories ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_grade_categories_update AFTER UPDATE ON grade_categories ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_grade_categories_delete AFTER DELETE ON grade_categories ${when} BEGIN ${note('OLD')} END;
+
+      ALTER TABLE events ADD COLUMN category_id TEXT;
+      ALTER TABLE events ADD COLUMN score REAL;       -- points earned; NULL = not graded yet
+      ALTER TABLE events ADD COLUMN max_score REAL;   -- points possible
+      ALTER TABLE tasks ADD COLUMN category_id TEXT;
+      ALTER TABLE tasks ADD COLUMN score REAL;
+      ALTER TABLE tasks ADD COLUMN max_score REAL;
+    `);
+    version = 14;
   }
 
   await db.execAsync(`PRAGMA user_version = ${version}`);

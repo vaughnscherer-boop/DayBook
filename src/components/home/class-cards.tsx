@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import type { CalendarItem } from '@/lib/calendar-items';
 import { confirmDestructive } from '@/lib/confirm';
 import { fromKey, todayKey } from '@/lib/dates';
+import { formatPercent, letter, type CourseGrade } from '@/lib/grades';
 
 type Props = {
   groups: Group[];
@@ -23,11 +24,13 @@ type Props = {
   activeIds: Set<string>;
   /** Upcoming items (today onward) to find each group's next meeting and counts. */
   upcoming: CalendarItem[];
+  /** Running grade per course (only those with a grading scheme). */
+  grades: Map<string, CourseGrade>;
   onChanged: () => void;
 };
 
 /** Home's "Classes" section: one card per class or group, with its next date and what's coming. */
-export function ClassCards({ groups: allGroups, classIds, activeIds, upcoming, onChanged }: Props) {
+export function ClassCards({ groups: allGroups, classIds, activeIds, upcoming, grades, onChanged }: Props) {
   const db = useSQLiteContext();
   const theme = useTheme();
   // Courses from an ended term are archived: out of the way, but still reachable from Settings → Terms.
@@ -90,9 +93,16 @@ export function ClassCards({ groups: allGroups, classIds, activeIds, upcoming, o
                 </View>
               </MenuButton>
             </View>
-            <ThemedText style={styles.name} numberOfLines={1}>
-              {group.name}
-            </ThemedText>
+            <View style={styles.nameRow}>
+              <ThemedText style={[styles.name, styles.flex]} numberOfLines={1}>
+                {group.name}
+              </ThemedText>
+              {grades.get(group.id)?.percent != null && (
+                <ThemedText type="smallBold" themeColor="textSecondary">
+                  {formatPercent(grades.get(group.id)!.percent!)} · {letter(grades.get(group.id)!.percent!)}
+                </ThemedText>
+              )}
+            </View>
             <View style={styles.counts}>
               <View style={[styles.dot, { backgroundColor: group.color }]} />
               <ThemedText type="caption" themeColor="textSecondary">
@@ -144,6 +154,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one + 1,
   },
   more: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
+  flex: { flex: 1 },
   name: { fontSize: 18, lineHeight: 23, fontWeight: 700 },
   counts: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 3.5, marginLeft: 4 },

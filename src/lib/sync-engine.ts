@@ -33,6 +33,7 @@ export type RunTransaction = (task: (db: SyncDb) => Promise<void>) => Promise<vo
 /** Synced tables, their key columns (`task_id|date` for completions) and their "last changed" column. */
 const TABLES: Record<string, { key: string[]; changedColumn: string }> = {
   calendars: { key: ['id'], changedColumn: 'updated_at' },
+  grade_categories: { key: ['id'], changedColumn: 'updated_at' },
   groups: { key: ['id'], changedColumn: 'updated_at' },
   events: { key: ['id'], changedColumn: 'updated_at' },
   preferences: { key: ['name'], changedColumn: 'updated_at' },

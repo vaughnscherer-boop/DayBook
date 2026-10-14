@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { createEvent } from '@/db/events';
 import { createGroup, type Group } from '@/db/groups';
+import { createCategory } from '@/db/grades';
 import { findOrCreateTerm } from '@/db/terms';
 import { createTask } from '@/db/tasks';
 import { tokens } from '@/lib/grouping';
@@ -41,6 +42,16 @@ function sameItem(
   }
   // Most words in common ("Story, Ch. 8" and "Story for Ch. 8" share 3 of 4).
   return best && best.score >= 0.34 ? best.id : null;
+}
+
+/** The syllabus's grade categories, unless the course already has some (a re-import keeps yours). */
+async function addGrading(db: SQLiteDatabase, groupId: string, grading: ImportPlan['groups'][number]['grading']) {
+  if (grading.length === 0) return;
+  const have = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM grade_categories WHERE group_id = ?', groupId);
+  if (have && have.n > 0) return;
+  for (const line of grading) {
+    await createCategory(db, { groupId, name: line.name, weight: line.weight, dropLowest: line.drop_lowest });
+  }
 }
 
 /**
@@ -96,6 +107,7 @@ export async function saveImport(
           same.id
         );
         groupIds.set(group.course, same.id);
+        await addGrading(db, same.id, group.grading);
       } else {
         const id = await createGroup(db, {
           calendarId: input.calendarId,
@@ -112,6 +124,7 @@ export async function saveImport(
           id
         );
         groupIds.set(group.course, id);
+        await addGrading(db, id, group.grading);
       }
     }
 
@@ -217,6 +230,10 @@ export async function undoImport(db: SQLiteDatabase, importId: string) {
     );
     await db.runAsync(
       'UPDATE tasks SET group_id = NULL, group_locked = 0 WHERE group_id IN (SELECT id FROM groups WHERE import_id = ?)',
+      importId
+    );
+    await db.runAsync(
+      'DELETE FROM grade_categories WHERE group_id IN (SELECT id FROM groups WHERE import_id = ?)',
       importId
     );
     await db.runAsync('DELETE FROM groups WHERE import_id = ?', importId);

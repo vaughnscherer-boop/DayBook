@@ -43,6 +43,8 @@ export type GroupDraft = {
   /** Where the class meets, and when office hours are, as read from the syllabus. */
   location: string | null;
   office_hours: string | null;
+  /** The grade categories the syllabus lists (percent weights). */
+  grading: { name: string; weight: number; drop_lowest: number }[];
 };
 /** The term the syllabus covers, with the breaks it lists. */
 export type TermDraft = { starts_on: string; ends_on: string; breaks: TermBreak[] };
@@ -172,6 +174,9 @@ export function buildImportPlan(schedule: ScheduleImport, choices: CourseChoice[
       keywords: courseKeywords(course),
       location: lecture?.location ?? null,
       office_hours: hours.length ? hours.map(describeMeeting).join('; ') : null,
+      grading: (course.grading ?? [])
+        .filter((line) => line.name.trim() && Number.isFinite(line.weight) && line.weight > 0)
+        .map((line) => ({ name: line.name.trim(), weight: line.weight, drop_lowest: line.drop_lowest ?? 0 })),
     });
 
     for (const meeting of pickedMeetings) {

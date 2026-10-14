@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { CourseInfoCard } from '@/components/course/course-info-card';
+import { GradeCard } from '@/components/course/grade-card';
 import { CourseUpcoming } from '@/components/course/course-upcoming';
 import { GroupList } from '@/components/group-list';
 import { ThemedText } from '@/components/themed-text';
@@ -13,6 +14,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Spacing } from '@/constants/theme';
 import { listTerms, type Term } from '@/db/terms';
 import { setOccurrenceDone, setTaskDone } from '@/db/tasks';
+import { gradeItems } from '@/db/grades';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import type { CalendarItem } from '@/lib/calendar-items';
 import { rescheduleAll } from '@/lib/notifications';
@@ -27,7 +29,7 @@ const SHOWN = 8;
 export default function CourseScreen() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const db = useSQLiteContext();
-  const { groups, itemsBetween, reload } = useCalendarData();
+  const { groups, itemsBetween, categories, grades, events, tasks, reload } = useCalendarData();
   const group = groups.find((g) => g.id === id);
   const [terms, setTerms] = useState<Term[]>([]);
 
@@ -87,6 +89,16 @@ export default function CourseScreen() {
             )}
 
             <CourseInfoCard group={group} terms={terms} onChanged={changed} />
+
+            <Section title="Grade">
+              <GradeCard
+                group={group}
+                categories={categories.filter((c) => c.group_id === group.id)}
+                items={gradeItems(group, events, tasks)}
+                result={grades.get(group.id)}
+                onChanged={changed}
+              />
+            </Section>
 
             <Section title="Coming up">
               <CourseUpcoming items={upcoming} onToggle={toggle} />

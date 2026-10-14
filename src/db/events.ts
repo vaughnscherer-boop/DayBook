@@ -22,6 +22,9 @@ export type CalendarEvent = {
   group_locked: 0 | 1; // 1 = placed by hand; automatic grouping leaves it alone
   item_type: ItemType | null; // null = guessed from the title
   details: string | null; // from an imported syllabus; read-only in the app
+  category_id: string | null; // grade category; null = picked by name/type
+  score: number | null; // points earned; null = not graded yet
+  max_score: number | null; // points possible
   created_at: string;
   updated_at: string;
 };

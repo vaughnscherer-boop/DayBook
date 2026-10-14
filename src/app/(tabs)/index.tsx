@@ -51,7 +51,7 @@ export default function HomeScreen() {
   }, [params.add]);
 
   const tabBarSpace = useTabBarSpace();
-  const { itemsBetween, groups, classes, activeGroupIds, reload } = useCalendarData();
+  const { itemsBetween, groups, classes, activeGroupIds, grades, reload } = useCalendarData();
   const status = useSyncExternalStore(subscribeSyncStatus, getSyncStatus);
   const [range, setRange] = useState<OverviewRange>('week');
   const days = rangeDays(range);
@@ -146,6 +146,7 @@ export default function HomeScreen() {
             classIds={classIds}
             activeIds={activeGroupIds}
             upcoming={upcoming}
+            grades={grades}
             onChanged={reload}
           />
         </ScrollView>

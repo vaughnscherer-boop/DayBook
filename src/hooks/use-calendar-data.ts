@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { listCalendars, type Calendar } from '@/db/calendars';
 import { listEvents, type CalendarEvent } from '@/db/events';
+import { gradeItems, listCategories, type GradeCategory } from '@/db/grades';
 import { autoGroup, listGroups, type Group } from '@/db/groups';
 import { listCompletions, listTasks, type Task, type TaskCompletion } from '@/db/tasks';
 import { buildItems, type CalendarItem } from '@/lib/calendar-items';
 import { buildClasses } from '@/lib/class-schedule';
 import { notifyLocalChange, onDataChanged } from '@/lib/data-events';
+import { courseGrade, type CourseGrade } from '@/lib/grades';
 
 /**
  * Loads events, tasks, task completions, calendars and groups, reloading whenever the screen comes
@@ -23,21 +25,24 @@ export function useCalendarData() {
   const [completions, setCompletions] = useState<TaskCompletion[]>([]);
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [categories, setCategories] = useState<GradeCategory[]>([]);
 
   const reload = useCallback(async () => {
     await autoGroup(db);
-    const [nextEvents, nextTasks, nextCompletions, nextCalendars, nextGroups] = await Promise.all([
+    const [nextEvents, nextTasks, nextCompletions, nextCalendars, nextGroups, nextCategories] = await Promise.all([
       listEvents(db),
       listTasks(db),
       listCompletions(db),
       listCalendars(db),
       listGroups(db),
+      listCategories(db),
     ]);
     setEvents(nextEvents);
     setTasks(nextTasks);
     setCompletions(nextCompletions);
     setCalendars(nextCalendars);
     setGroups(nextGroups);
+    setCategories(nextCategories);
     // Linked iPhone calendars pick up whatever just changed.
     notifyLocalChange();
   }, [db]);
@@ -70,5 +75,15 @@ export function useCalendarData() {
     [events, tasks]
   );
 
-  return { itemsBetween, calendars, groups, classes, activeGroupIds, reload };
+  // Each course's running grade, for courses that have a grading scheme.
+  const grades = useMemo(() => {
+    const result = new Map<string, CourseGrade>();
+    for (const group of groups) {
+      const mine = categories.filter((c) => c.group_id === group.id);
+      if (mine.length > 0) result.set(group.id, courseGrade(mine, gradeItems(group, events, tasks)));
+    }
+    return result;
+  }, [groups, categories, events, tasks]);
+
+  return { itemsBetween, calendars, groups, classes, activeGroupIds, categories, grades, events, tasks, reload };
 }

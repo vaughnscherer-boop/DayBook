@@ -39,6 +39,9 @@ export type ScheduleItem = {
   details: string | null;
 };
 
+/** One line of a syllabus's grading breakdown: "Exams 40%", "Best 8 of 10 quizzes 20%". */
+export type ScheduleGrading = { name: string; weight: number; drop_lowest: number | null };
+
 export type ScheduleCourse = {
   code: string | null; // "BIO 150"
   name: string; // "Evolution" / "Beginning Latin I"
@@ -46,6 +49,8 @@ export type ScheduleCourse = {
   sections: string[]; // ["Lab A", "Lab B", "Lab C"]; empty when there's only one
   meetings: ScheduleMeeting[];
   items: ScheduleItem[];
+  /** How the course grade is weighted; [] when the document doesn't say. Older saved reads lack it. */
+  grading?: ScheduleGrading[];
 };
 
 export type ScheduleImport = {
@@ -98,6 +103,15 @@ export const SCHEDULE_SCHEMA = object({
           first_date: { ...nullable('string'), description: 'First meeting (YYYY-MM-DD), or null' },
           last_date: { ...nullable('string'), description: 'Last meeting (YYYY-MM-DD), or null' },
           cancelled_dates: { type: 'array', items: date('A date this meeting does not happen') },
+        }),
+      },
+      grading: {
+        type: 'array',
+        description: 'The grading breakdown: each category with its percent of the course grade; [] if none is given',
+        items: object({
+          name: { type: 'string', description: 'Category as a student would say it: "Exams", "Homework", "Quizzes"' },
+          weight: { type: 'number', description: 'Percent of the course grade (40 for 40%)' },
+          drop_lowest: { ...nullable('integer'), description: 'How many of the lowest scores are dropped, or null' },
         }),
       },
       items: {
