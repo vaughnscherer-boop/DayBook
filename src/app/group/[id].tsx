@@ -1,9 +1,10 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 
 import { GroupList } from '@/components/group-list';
 import { ThemedView } from '@/components/themed-view';
+import { CloseButton, closeModal } from '@/components/ui/close-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Spacing } from '@/constants/theme';
 import { useCalendarData } from '@/hooks/use-calendar-data';
@@ -18,11 +19,12 @@ export default function GroupScreen() {
   const seen = useRef(false);
   useEffect(() => {
     if (group) seen.current = true;
-    else if (seen.current) router.back();
+    else if (seen.current) closeModal();
   }, [group]);
 
   return (
     <ThemedView style={styles.container}>
+      <Stack.Screen options={{ headerRight: () => <CloseButton /> }} />
       <ScrollView contentContainerStyle={styles.content}>
         {group ? (
           <GroupList

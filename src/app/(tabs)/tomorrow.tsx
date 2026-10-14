@@ -13,6 +13,7 @@ import { ThemedView } from '@/components/themed-view';
 import { TaskCheck } from '@/components/ui/task-check';
 import { Spacing } from '@/constants/theme';
 import { getSettings } from '@/db/settings';
+import { useShortTitles } from '@/hooks/use-short-titles';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { useTheme } from '@/hooks/use-theme';
 import { itemsOnDay } from '@/lib/calendar-items';
@@ -72,6 +73,7 @@ export default function TomorrowScreen() {
 
   const text = rows.map((row) => row.text).join('\n');
   const lines = planLines(text, day, { calendars, classes, defaultCalendarId: fallbackCalendar, chosenClasses });
+  const { short, settle } = useShortTitles(lines.map((line) => line.parsed.title));
   const waiting = lines.filter((line) => line.needsClass).length;
 
   const newRow = (rowText = ''): Row => ({ id: nextId.current++, text: rowText });
@@ -103,7 +105,13 @@ export default function TomorrowScreen() {
   const save = async () => {
     if (saving || lines.length === 0 || waiting > 0) return;
     setSaving(true);
-    for (const line of lines) await createFromParsed(db, line.kind, line.parsed, line.calendar?.id ?? null);
+    await settle();
+    for (const line of lines) {
+      const title = short(line.parsed.title);
+      // The wording as typed stays in the notes when the title was shortened.
+      const notes = title === line.parsed.title ? undefined : line.text;
+      await createFromParsed(db, line.kind, { ...line.parsed, title }, line.calendar?.id ?? null, notes);
+    }
     rescheduleAll(db);
     // The tab stays mounted, so clear the list for next time.
     setRows([{ id: nextId.current++, text: '' }]);
@@ -200,7 +208,7 @@ export default function TomorrowScreen() {
                   )}
                   <View style={styles.flex}>
                     <ThemedText type="smallBold" numberOfLines={1}>
-                      {line.parsed.title}
+                      {short(line.parsed.title)}
                     </ThemedText>
                     <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
                       {line.kind === 'task' ? 'Task' : 'Event'} · {when(line, day)}

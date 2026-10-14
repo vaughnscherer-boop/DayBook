@@ -33,8 +33,8 @@ export default function NewScreen() {
   }, []);
   const chosen = calendars.find((c) => c.id === calendarId)?.id ?? calendars.find((c) => c.is_default)?.id ?? null;
 
-  const add = async ({ kind, parsed, calendarId: target }: NewEntry) => {
-    await createFromParsed(db, kind, parsed, target);
+  const add = async ({ kind, parsed, calendarId: target, notes }: NewEntry) => {
+    await createFromParsed(db, kind, parsed, target, notes);
     rescheduleAll(db);
     // Show where it landed.
     router.back();

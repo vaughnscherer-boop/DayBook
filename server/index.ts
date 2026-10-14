@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 
 import { IMPORT_TYPES, MAX_IMPORT_BYTES, type ImportResponse } from '../src/lib/schedule-format.ts';
 import { readSchedule, ScheduleReadError } from './read-schedule.ts';
+import { summarizeTitles, SummarizeError } from './summarize-titles.ts';
 
 /**
  * Daybook's import server: POST /api/import { fileName, mediaType, data (base64), today } -> ImportResponse.
@@ -17,7 +18,7 @@ const DAILY_LIMIT = 20;
 // runaway loop from emptying the account, not a real quota (that needs sign-in).
 const usage = new Map<string, { day: string; count: number }>();
 
-function send(res: ServerResponse, status: number, body: ImportResponse | { ok: true }) {
+function send(res: ServerResponse, status: number, body: ImportResponse | { ok: true } | { ok: true; titles: string[] }) {
   res.writeHead(status, {
     'content-type': 'application/json',
     // The app's web build runs on another origin (the Expo dev server or its own host).
@@ -84,6 +85,27 @@ async function handleImport(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+/** POST /api/summarize { titles: string[] } -> { ok, titles }: the local twin of the summarize-titles function. */
+async function handleSummarize(req: IncomingMessage, res: ServerResponse) {
+  if (!process.env.ANTHROPIC_API_KEY) return fail(res, 500, 'No ANTHROPIC_API_KEY in .env.local.');
+  let titles: unknown;
+  try {
+    titles = (JSON.parse((await readBody(req)) ?? '') as { titles?: unknown }).titles;
+  } catch {
+    return fail(res, 400, 'Bad request.');
+  }
+  if (!Array.isArray(titles) || titles.length === 0 || titles.length > 30 || titles.some((t) => typeof t !== 'string' || t.length > 300)) {
+    return fail(res, 400, 'Send 1–30 titles of up to 300 characters.');
+  }
+  try {
+    send(res, 200, { ok: true, titles: await summarizeTitles(titles as string[], AbortSignal.timeout(10_000)) });
+  } catch (error) {
+    if (error instanceof SummarizeError) return fail(res, 502, error.message);
+    console.error('[summarize] failed', error);
+    fail(res, 500, 'Something went wrong.');
+  }
+}
+
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0];
   if (req.method === 'OPTIONS') return send(res, 204, { ok: true });
@@ -93,6 +115,10 @@ const server = createServer((req, res) => {
       console.error('[import] crashed', error);
       fail(res, 500, 'Something went wrong reading that file — please try again.');
     });
+    return;
+  }
+  if (req.method === 'POST' && path === '/api/summarize') {
+    handleSummarize(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
     return;
   }
   fail(res, 404, 'Not found.');

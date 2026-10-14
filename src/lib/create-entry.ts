@@ -24,12 +24,13 @@ export function calendarFor(parsed: ParsedEvent, calendars: Calendar[], fallback
 }
 
 /** Saves typed text as an event or task (the add box and the night check-in both use this). */
-export async function createFromParsed(db: SQLiteDatabase, kind: EntryKind, parsed: ParsedEvent, calendarId: string | null) {
+export async function createFromParsed(db: SQLiteDatabase, kind: EntryKind, parsed: ParsedEvent, calendarId: string | null, notes?: string) {
   // "due next class" homework belongs to that class's group.
   const group = parsed.classRef?.kind === 'found' ? { groupId: parsed.classRef.groupId } : undefined;
   if (kind === 'event') {
     return createEvent(db, {
       title: parsed.title,
+      notes,
       starts_at: parsed.starts_at,
       ends_at: parsed.ends_at,
       all_day: parsed.allDay,
@@ -41,6 +42,7 @@ export async function createFromParsed(db: SQLiteDatabase, kind: EntryKind, pars
   }
   return createTask(db, {
     title: parsed.title,
+    notes,
     date: parsed.starts_at.slice(0, 10),
     time: parsed.allDay ? null : parsed.starts_at.slice(11, 16),
     calendar_id: calendarId,

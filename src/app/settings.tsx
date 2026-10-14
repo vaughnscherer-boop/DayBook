@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -10,6 +10,7 @@ import { NotificationSettings } from '@/components/notification-settings';
 import { PhoneCalendars } from '@/components/phone-calendars';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { CloseButton } from '@/components/ui/close-button';
 import { Spacing } from '@/constants/theme';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { deviceCalendarsAvailable } from '@/lib/device-calendars';
@@ -35,6 +36,7 @@ export default function SettingsScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <Stack.Screen options={{ headerRight: () => <CloseButton /> }} />
       <ScrollView contentContainerStyle={styles.content}>
         {section('CALENDARS', <CalendarList calendars={calendars} groups={groups} onChanged={changed} />)}
         {section('GOOGLE CALENDAR', <GoogleCalendars calendars={calendars} />)}

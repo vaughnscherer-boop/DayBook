@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import type { Calendar } from '@/db/calendars';
+import { useShortTitles } from '@/hooks/use-short-titles';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateKey, formatTime } from '@/lib/dates';
 import type { ClassInfo } from '@/lib/class-schedule';
@@ -14,7 +15,7 @@ import { parseEvent, type ParsedEvent } from '@/lib/parse-event';
 import { describeRule } from '@/lib/recurrence';
 
 export type AddKind = 'event' | 'task';
-export type NewEntry = { kind: AddKind; parsed: ParsedEvent; calendarId: string | null };
+export type NewEntry = { kind: AddKind; parsed: ParsedEvent; calendarId: string | null; notes?: string };
 
 type Props = {
   calendars: Calendar[];
@@ -59,6 +60,7 @@ export function AddBox({ calendars, referenceDay, calendarId, classes, onCalenda
   const [chosenClassId, setChosenClassId] = useState<string | null>(null);
 
   const parsed = parseEvent(text.replace(TASK_PREFIX, ''), referenceDay, { classes, chosenClassId });
+  const { short, settle } = useShortTitles(parsed ? [parsed.title] : []);
   const classRef = parsed?.classRef ?? null;
   // Something "due next class" is a task, whichever mode is on.
   const kind: AddKind = TASK_PREFIX.test(text) || (classRef && classRef.kind !== 'none') ? 'task' : mode;
@@ -72,9 +74,17 @@ export function AddBox({ calendars, referenceDay, calendarId, classes, onCalenda
     : { calendar: calendars.find((c) => c.id === calendarId) ?? calendars[0], unknownTag: null };
   const color = classColor ?? calendar?.color ?? theme.accent;
 
-  const submit = () => {
+  const submit = async () => {
     if (!parsed || !canAdd) return;
-    onAdd({ kind, parsed, calendarId: calendar?.id ?? null });
+    await settle();
+    const title = short(parsed.title);
+    onAdd({
+      kind,
+      parsed: { ...parsed, title },
+      calendarId: calendar?.id ?? null,
+      // The wording as typed stays in the notes when the title was shortened.
+      notes: title === parsed.title ? undefined : text.replace(TASK_PREFIX, '').trim(),
+    });
     setText('');
     setChosenClassId(null);
   };
@@ -128,7 +138,7 @@ export function AddBox({ calendars, referenceDay, calendarId, classes, onCalenda
           <ThemedText type="small" themeColor="textSecondary" numberOfLines={2} style={styles.previewText}>
             <ThemedText type="smallBold">
               {kind === 'task' ? '☐ ' : ''}
-              {parsed.title}
+              {short(parsed.title)}
             </ThemedText>{' '}
             · {describe(kind, parsed)}
           </ThemedText>

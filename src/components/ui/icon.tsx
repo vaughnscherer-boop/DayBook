@@ -17,6 +17,7 @@ const NAMES = {
   repeat: { ios: 'repeat', android: 'repeat', web: 'repeat' },
   sun: { ios: 'sun.max', android: 'light_mode', web: 'light_mode' },
   empty: { ios: 'leaf', android: 'eco', web: 'eco' },
+  close: { ios: 'xmark', android: 'close', web: 'close' },
   add: { ios: 'plus', android: 'add', web: 'add' },
   home: { ios: 'house', android: 'home', web: 'home' },
   homeFilled: { ios: 'house.fill', android: 'home', web: 'home' },
