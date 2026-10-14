@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const LATEST_VERSION = 14;
+const LATEST_VERSION = 15;
 
 /**
  * Creates/upgrades the database schema. Each time the schema changes, add a new
@@ -357,6 +357,40 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
       ALTER TABLE tasks ADD COLUMN max_score REAL;
     `);
     version = 14;
+  }
+
+  if (version < 15) {
+    // School-site calendar feeds (Canvas, Moodle...). Items a feed adds are tagged with their feed and
+    // the site's own id (feed_uid), so a refresh updates them instead of adding copies. feed_hash is
+    // the feed's version of the item when last applied: your own edits stay until the feed changes it.
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const note = (row: 'NEW' | 'OLD') =>
+      `INSERT OR REPLACE INTO sync_outbox (tbl, id, changed_at) VALUES ('feeds', ${row}.id, ${now});`;
+    const when = 'WHEN (SELECT applying FROM sync_meta) = 0';
+    await db.execAsync(`
+      CREATE TABLE feeds (
+        id TEXT PRIMARY KEY NOT NULL,   -- derived from the link, so two devices adding it make one feed
+        url TEXT NOT NULL,
+        site TEXT NOT NULL,             -- 'canvas' | 'moodle' | 'blackboard' | 'brightspace' | 'schoology' | 'other'
+        label TEXT NOT NULL,
+        calendar_id TEXT,
+        last_synced_at TEXT,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TRIGGER sync_feeds_insert AFTER INSERT ON feeds ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_feeds_update AFTER UPDATE ON feeds ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_feeds_delete AFTER DELETE ON feeds ${when} BEGIN ${note('OLD')} END;
+
+      ALTER TABLE events ADD COLUMN feed_id TEXT;
+      ALTER TABLE events ADD COLUMN feed_uid TEXT;
+      ALTER TABLE events ADD COLUMN feed_hash TEXT;
+      ALTER TABLE tasks ADD COLUMN feed_id TEXT;
+      ALTER TABLE tasks ADD COLUMN feed_uid TEXT;
+      ALTER TABLE tasks ADD COLUMN feed_hash TEXT;
+      CREATE INDEX idx_events_feed ON events (feed_id);
+      CREATE INDEX idx_tasks_feed ON tasks (feed_id);
+    `);
+    version = 15;
   }
 
   await db.execAsync(`PRAGMA user_version = ${version}`);

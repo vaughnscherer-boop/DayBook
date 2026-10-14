@@ -1,7 +1,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
+import type { FeedResponse } from '../src/lib/feed-format.ts';
 import { IMPORT_TYPES, MAX_IMPORT_BYTES, type ImportResponse } from '../src/lib/schedule-format.ts';
 import { readSchedule, ScheduleReadError } from './read-schedule.ts';
+import { FeedError, readFeed } from './school-feed.ts';
 import { summarizeTitles, SummarizeError } from './summarize-titles.ts';
 
 /**
@@ -18,7 +20,11 @@ const DAILY_LIMIT = 20;
 // runaway loop from emptying the account, not a real quota (that needs sign-in).
 const usage = new Map<string, { day: string; count: number }>();
 
-function send(res: ServerResponse, status: number, body: ImportResponse | { ok: true } | { ok: true; titles: string[] }) {
+function send(
+  res: ServerResponse,
+  status: number,
+  body: ImportResponse | FeedResponse | { ok: true } | { ok: true; titles: string[] }
+) {
   res.writeHead(status, {
     'content-type': 'application/json',
     // The app's web build runs on another origin (the Expo dev server or its own host).
@@ -106,6 +112,27 @@ async function handleSummarize(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+/**
+ * POST /api/feed { url } -> FeedResponse: the local twin of the school-feed function. FEED_ALLOW_LOCAL=1
+ * also lets it read http:// and localhost links, for trying feeds out on your own computer.
+ */
+async function handleFeed(req: IncomingMessage, res: ServerResponse) {
+  let url: unknown;
+  try {
+    url = (JSON.parse((await readBody(req)) ?? '') as { url?: unknown }).url;
+  } catch {
+    return fail(res, 400, 'Bad request.');
+  }
+  if (typeof url !== 'string' || url.length === 0 || url.length > 2000) return fail(res, 400, 'Send the calendar link.');
+  try {
+    send(res, 200, await readFeed(url, { allowLocal: process.env.FEED_ALLOW_LOCAL === '1' }));
+  } catch (error) {
+    if (error instanceof FeedError) return fail(res, 400, error.message);
+    console.error('[feed] failed', error);
+    fail(res, 500, 'Something went wrong reading that calendar.');
+  }
+}
+
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0];
   if (req.method === 'OPTIONS') return send(res, 204, { ok: true });
@@ -119,6 +146,10 @@ const server = createServer((req, res) => {
   }
   if (req.method === 'POST' && path === '/api/summarize') {
     handleSummarize(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
+    return;
+  }
+  if (req.method === 'POST' && path === '/api/feed') {
+    handleFeed(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
     return;
   }
   fail(res, 404, 'Not found.');

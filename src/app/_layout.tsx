@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { DeviceCalendarSync } from '@/components/device-calendar-sync';
+import { FeedSync } from '@/components/feed-sync';
 import { GoogleSync } from '@/components/google-sync';
 import { NotificationSync } from '@/components/notification-sync';
 import { SyncProvider } from '@/components/sync-provider';
@@ -42,6 +43,7 @@ export default function RootLayout() {
           <SyncProvider />
           <DeviceCalendarSync />
           <GoogleSync />
+          <FeedSync />
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="event/[id]" options={{ presentation: 'modal' }} />

@@ -25,6 +25,9 @@ export type Task = {
   category_id: string | null; // grade category; null = picked by name/type
   score: number | null; // points earned; null = not graded yet
   max_score: number | null; // points possible
+  feed_id: string | null; // the school-site feed that added it
+  feed_uid: string | null; // that site's own id for it
+  feed_hash: string | null; // the feed's version when last applied
   created_at: string;
   updated_at: string;
 };
@@ -33,6 +36,8 @@ export type Task = {
 export type TaskCompletion = { task_id: string; date: string; completed_at: string };
 
 export type TaskInput = {
+  /** A fixed id (feeds use one derived from the item, so two devices make the same row); else random. */
+  id?: string;
   title: string;
   notes?: string | null;
   date: string;
@@ -58,7 +63,7 @@ export async function getTask(db: SQLiteDatabase, id: string): Promise<Task | nu
 }
 
 export async function createTask(db: SQLiteDatabase, input: TaskInput): Promise<string> {
-  const id = randomUUID();
+  const id = input.id ?? randomUUID();
   const group = groupColumns(input.group);
   const now = new Date().toISOString();
   await db.runAsync(
