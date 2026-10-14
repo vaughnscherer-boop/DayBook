@@ -24,7 +24,7 @@ const FEATURES = [
   { icon: '✏️', title: 'Just type it', text: '“gym tomorrow 6pm”, “bio hw due next class” — Daybook figures out the rest.' },
   { icon: '🎨', title: 'Organizes itself', text: 'Each class or activity gets its own group and color; tests, homework and classes get their own shades.' },
   { icon: '📄', title: 'Reads your syllabus', text: 'Import a PDF and every class, test and assignment lands on your calendar — with what each one is about.' },
-  { icon: '☀️', title: 'Morning brief & night check-in', text: 'See your whole day each morning; jot down tomorrow’s list each night.' },
+  { icon: '☀️', title: 'Morning brief & night check-in', text: 'See your whole day each morning; jot down new tasks coming up each night.' },
 ];
 
 /** The first-launch intro: what Daybook does, sign in to sync, reminder times. Every step can be skipped. */

@@ -3,10 +3,13 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
+import { CourseDocuments } from '@/components/course/course-documents';
 import { CourseInfoCard } from '@/components/course/course-info-card';
+import { FixMistakes } from '@/components/course/fix-mistakes';
+import { GradeImport } from '@/components/course/grade-import';
 import { GradeCard } from '@/components/course/grade-card';
 import { CourseUpcoming } from '@/components/course/course-upcoming';
-import { StudyPlanner } from '@/components/course/study-planner';
+import { CourseStudy } from '@/components/course/course-study';
 import { GroupList } from '@/components/group-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -27,7 +30,10 @@ const LOOKAHEAD_DAYS = 120;
 const SHOWN = 8;
 const STUDY_LOOKAHEAD_DAYS = 28;
 
-/** One class: where and when it meets, its links, what's coming up, and (⋯ → Edit) its name, color and shades. */
+/**
+ * One class: where and when it meets, its links, grade (typed in or imported from the school site), what's
+ * coming up, its documents, "Fix mistakes", and (⋯ → Edit) its name, color and shades.
+ */
 export default function CourseScreen() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const db = useSQLiteContext();
@@ -65,12 +71,17 @@ export default function CourseScreen() {
     );
   }, [group, itemsBetween, today]);
 
-  // Exams in the next few weeks get a study planner; later ones can wait.
-  const exams = useMemo(
+  // Exams and assignments in the next few weeks can get study time; later ones can wait.
+  const studyFor = useMemo(
     () =>
       group
         ? itemsBetween(today, shiftKey(today, STUDY_LOOKAHEAD_DAYS)).filter(
-            (item) => item.groupId === group.id && item.itemType === 'exam' && !item.repeating && !item.done
+            (item) =>
+              item.groupId === group.id &&
+              (item.itemType === 'exam' || item.itemType === 'assignment') &&
+              !item.repeating &&
+              !item.done &&
+              item.startDay > today
           )
         : [],
     [group, itemsBetween, today]
@@ -111,25 +122,38 @@ export default function CourseScreen() {
                 result={grades.get(group.id)}
                 onChanged={changed}
               />
+              <GradeImport
+                group={group}
+                categories={categories.filter((c) => c.group_id === group.id)}
+                events={events}
+                tasks={tasks}
+                percent={grades.get(group.id)?.percent ?? null}
+                onChanged={changed}
+              />
             </Section>
 
             <Section title="Coming up">
               <CourseUpcoming items={upcoming} onToggle={toggle} />
             </Section>
 
-            {exams.length > 0 && (
+            {studyFor.length > 0 && (
               <Section title="Study">
-                {exams.map((exam) => (
-                  <StudyPlanner
-                    key={exam.key}
-                    exam={exam}
-                    calendarId={group.calendar_id}
-                    items={itemsBetween(today, exam.startDay)}
-                    onChanged={changed}
-                  />
-                ))}
+                <CourseStudy
+                  choices={studyFor}
+                  calendarId={group.calendar_id}
+                  itemsUntil={(day) => itemsBetween(today, day)}
+                  onChanged={changed}
+                />
               </Section>
             )}
+
+            <Section title="Documents">
+              <CourseDocuments groupId={group.id} onChanged={changed} />
+            </Section>
+
+            <Section title="Fix mistakes">
+              <FixMistakes group={group} events={events} tasks={tasks} onChanged={changed} />
+            </Section>
 
             <Section title="Edit class">
               <GroupList

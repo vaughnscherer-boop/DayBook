@@ -1,4 +1,4 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
@@ -17,6 +17,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TypeChips } from '@/components/type-chips';
 import { TaskCheck } from '@/components/ui/task-check';
+import { nativeOnly } from '@/components/ui/back-arrow';
+import { closeModal } from '@/components/ui/close-button';
 import { Spacing } from '@/constants/theme';
 import { listCalendars, type Calendar } from '@/db/calendars';
 import { learnFromPlacement, listGroups, type Group, type GroupChoice } from '@/db/groups';
@@ -128,7 +130,7 @@ export default function TaskScreen() {
         await learnFromPlacement(db, groupChoice.groupId, title);
       }
       rescheduleAll(db);
-      router.back();
+      closeModal();
     };
 
     if (isNew) {
@@ -173,7 +175,7 @@ export default function TaskScreen() {
     const removeAll = async () => {
       await deleteTask(db, id);
       rescheduleAll(db);
-      router.back();
+      closeModal();
     };
     if (!series) {
       confirmDestructive('Delete task?', title, 'Delete', removeAll);
@@ -186,7 +188,7 @@ export default function TaskScreen() {
         onPress: async () => {
           await addTaskException(db, id, series.occurrence);
           rescheduleAll(db);
-          router.back();
+          closeModal();
         },
       },
       { label: 'Delete all tasks', style: 'destructive', onPress: removeAll },
@@ -217,11 +219,11 @@ export default function TaskScreen() {
       <Stack.Screen
         options={{
           title: isNew ? 'New Task' : 'Edit Task',
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={8}>
+          headerLeft: nativeOnly(() => (
+            <Pressable onPress={closeModal} hitSlop={8}>
               <ThemedText style={{ color: theme.accent }}>Cancel</ThemedText>
             </Pressable>
-          ),
+          )),
           headerRight: () => (
             <Pressable onPress={save} hitSlop={8}>
               <ThemedText type="smallBold" style={[styles.headerButton, { color: theme.accent }]}>

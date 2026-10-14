@@ -7,7 +7,7 @@ import { parseEvent, type ParsedEvent } from '@/lib/parse-event';
 
 /**
  * The night check-in: a bullet list ("• gym 7am", "• bio hw due next class", "• call mom") turned
- * into events and tasks for tomorrow. Pure, so it can be checked without the app.
+ * into events and tasks: tomorrow unless a line names a later day. Pure, so it can be checked without the app.
  */
 
 export type PlannedLine = {

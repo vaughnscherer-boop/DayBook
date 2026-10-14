@@ -39,8 +39,9 @@ function when(line: PlannedLine, day: string): string {
 }
 
 /**
- * The night check-in (opened from the night notification): type tomorrow's list as bullets and it's
- * sorted onto the calendar — times become events, homework and errands become tasks.
+ * The night check-in, "New tasks coming up?" (opened from the night notification): type what's coming
+ * as bullets and it's sorted onto the calendar — times become events, homework and errands become
+ * tasks. Lines without a date go on tomorrow; "essay due friday" or "quiz in 3 days" go on that day.
  */
 export default function TomorrowScreen() {
   const db = useSQLiteContext();
@@ -117,7 +118,9 @@ export default function TomorrowScreen() {
     setRows([{ id: nextId.current++, text: '' }]);
     setChosenClasses({});
     setSaving(false);
-    router.navigate({ pathname: '/calendar', params: { date: day } });
+    // Show the first day something landed on (not always tomorrow).
+    const first = lines.map((line) => line.parsed.starts_at.slice(0, 10)).sort()[0] ?? day;
+    router.navigate({ pathname: '/calendar', params: { date: first } });
   };
 
   const colorOf = ({ parsed, calendar }: PlannedLine) => {
@@ -133,9 +136,9 @@ export default function TomorrowScreen() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View>
             <ThemedText type="subtitle" style={styles.heading}>
-              What’s on for tomorrow?
+              New Tasks Coming Up?
             </ThemedText>
-            <ThemedText themeColor="textSecondary">{formatDateKey(day)}</ThemedText>
+            <ThemedText themeColor="textSecondary">Anything without a date goes on {formatDateKey(day)}</ThemedText>
           </View>
           <ReminderLink kind="night" />
 
@@ -182,7 +185,7 @@ export default function TomorrowScreen() {
                   onFocus={() => setFocusId(null)}
                   submitBehavior="submit"
                   returnKeyType="next"
-                  placeholder={i === 0 ? 'gym 7am' : i === 1 ? 'bio hw due next class' : i === 2 ? 'call mom' : ''}
+                  placeholder={i === 0 ? 'gym 7am' : i === 1 ? 'bio essay due friday' : i === 2 ? 'call mom' : ''}
                   placeholderTextColor={theme.textSecondary}
                   style={[styles.input, { color: theme.text }]}
                 />
@@ -190,8 +193,9 @@ export default function TomorrowScreen() {
             ))}
           </ThemedView>
           <ThemedText type="small" themeColor="textSecondary">
-            One thing per line. Add a time to put it on the calendar (“gym 7am”); everything else becomes a task.
-            “Due next class” and “#work” work too.
+            One thing per line. Add a day for anything later than tomorrow (“lab report due thursday”, “quiz in 3 days”).
+            Add a time to put it on the calendar (“gym 7am”); everything else becomes a task. “Due next class” and
+            “#work” work too.
           </ThemedText>
 
           {lines.length > 0 && (

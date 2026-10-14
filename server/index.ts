@@ -2,8 +2,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 
 import { MAX_BREAKDOWN_TEXT, type BreakdownResponse } from '../src/lib/breakdown-format.ts';
 import type { FeedResponse } from '../src/lib/feed-format.ts';
+import { parseFixRequest, type FixResponse } from '../src/lib/fix-format.ts';
+import { parseGradeRequest, type GradeResponse } from '../src/lib/grade-import-format.ts';
 import { isImportType, MAX_IMPORT_BYTES, MAX_IMPORT_TEXT, TEXT_IMPORT, type ImportResponse } from '../src/lib/schedule-format.ts';
 import { BreakdownError, breakDown } from './break-down.ts';
+import { ClaudeError } from './claude-json.ts';
+import { fixClass } from './fix-class.ts';
+import { readGrades } from './read-grades.ts';
 import { readSchedule, ScheduleReadError } from './read-schedule.ts';
 import { FeedError, readFeed } from './school-feed.ts';
 import { summarizeTitles, SummarizeError } from './summarize-titles.ts';
@@ -25,7 +30,7 @@ const usage = new Map<string, { day: string; count: number }>();
 function send(
   res: ServerResponse,
   status: number,
-  body: ImportResponse | FeedResponse | BreakdownResponse | { ok: true } | { ok: true; titles: string[] }
+  body: ImportResponse | FeedResponse | BreakdownResponse | GradeResponse | FixResponse | { ok: true } | { ok: true; titles: string[] }
 ) {
   res.writeHead(status, {
     'content-type': 'application/json',
@@ -58,13 +63,14 @@ async function handleImport(req: IncomingMessage, res: ServerResponse) {
   const text = await readBody(req);
   if (text === null) return fail(res, 413, 'That file is over 15 MB.');
 
-  let body: { fileName?: unknown; mediaType?: unknown; data?: unknown; today?: unknown };
+  let body: { fileName?: unknown; mediaType?: unknown; data?: unknown; today?: unknown; course?: unknown };
   try {
     body = JSON.parse(text);
   } catch {
     return fail(res, 400, 'The upload didn’t arrive in one piece — please try again.');
   }
   const { fileName, mediaType, data, today } = body;
+  const course = typeof body.course === 'string' && body.course.trim() ? body.course.trim().slice(0, 120) : null;
   if (typeof data !== 'string' || typeof mediaType !== 'string' || typeof today !== 'string') {
     return fail(res, 400, 'Missing file.');
   }
@@ -82,6 +88,7 @@ async function handleImport(req: IncomingMessage, res: ServerResponse) {
     const result = await readSchedule({
       data,
       mediaType,
+      course,
       fileName: typeof fileName === 'string' ? fileName.slice(0, 200) : 'schedule',
       today: /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : day,
     });
@@ -141,6 +148,48 @@ async function handleBreakDown(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+/** POST /api/read-grades GradeRequest -> GradeResponse: the local twin of the read-grades function. */
+async function handleReadGrades(req: IncomingMessage, res: ServerResponse) {
+  if (!process.env.ANTHROPIC_API_KEY) return fail(res, 500, 'No ANTHROPIC_API_KEY in .env.local.');
+  const text = await readBody(req);
+  if (text === null) return fail(res, 413, 'That file is over 15 MB.');
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return fail(res, 400, 'Bad request.');
+  }
+  const request = parseGradeRequest(body, { maxText: MAX_IMPORT_TEXT, maxBytes: MAX_IMPORT_BYTES, isType: isImportType, textType: TEXT_IMPORT });
+  if (typeof request === 'string') return fail(res, 400, request);
+  try {
+    send(res, 200, { ok: true, read: await readGrades(request, 'high', AbortSignal.timeout(180_000)) });
+  } catch (error) {
+    if (error instanceof ClaudeError) return fail(res, 502, error.message);
+    console.error('[read-grades] failed', error);
+    fail(res, 500, 'Something went wrong.');
+  }
+}
+
+/** POST /api/fix-class FixRequest -> FixResponse: the local twin of the fix-class function. */
+async function handleFixClass(req: IncomingMessage, res: ServerResponse) {
+  if (!process.env.ANTHROPIC_API_KEY) return fail(res, 500, 'No ANTHROPIC_API_KEY in .env.local.');
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse((await readBody(req)) ?? '');
+  } catch {
+    return fail(res, 400, 'Bad request.');
+  }
+  const request = parseFixRequest(body);
+  if (typeof request === 'string') return fail(res, 400, request);
+  try {
+    send(res, 200, { ok: true, plan: await fixClass(request, 'high', AbortSignal.timeout(180_000)) });
+  } catch (error) {
+    if (error instanceof ClaudeError) return fail(res, 502, error.message);
+    console.error('[fix-class] failed', error);
+    fail(res, 500, 'Something went wrong.');
+  }
+}
+
 /**
  * POST /api/feed { url } -> FeedResponse: the local twin of the school-feed function. FEED_ALLOW_LOCAL=1
  * also lets it read http:// and localhost links, for trying feeds out on your own computer.
@@ -179,6 +228,14 @@ const server = createServer((req, res) => {
   }
   if (req.method === 'POST' && path === '/api/break-down') {
     handleBreakDown(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
+    return;
+  }
+  if (req.method === 'POST' && path === '/api/read-grades') {
+    handleReadGrades(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
+    return;
+  }
+  if (req.method === 'POST' && path === '/api/fix-class') {
+    handleFixClass(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
     return;
   }
   if (req.method === 'POST' && path === '/api/feed') {

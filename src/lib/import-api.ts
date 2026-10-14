@@ -19,13 +19,13 @@ function localServerUrl(): string {
   return `http://${host}:${DEV_PORT}`;
 }
 
-async function viaServer(url: string, file: PickedFile, deviceId: string): Promise<ImportResponse> {
+async function viaServer(url: string, file: PickedFile, deviceId: string, course: string | null): Promise<ImportResponse> {
   let response: Response;
   try {
     response = await fetch(`${url}/api/import`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-device-id': deviceId },
-      body: JSON.stringify({ ...file, today: todayKey() }),
+      body: JSON.stringify({ ...file, course, today: todayKey() }),
     });
   } catch {
     return { ok: false, error: 'Couldn’t reach the import server — start it with “npm run server”.' };
@@ -40,18 +40,19 @@ async function viaServer(url: string, file: PickedFile, deviceId: string): Promi
 /**
  * Has Claude read the file. Normally that's the hosted `import-schedule` function in Supabase, which
  * works from anywhere for signed-in accounts; EXPO_PUBLIC_IMPORT_API_URL (e.g. the local
- * `npm run server`) overrides it while developing. Takes 30–120 seconds.
+ * `npm run server`) overrides it while developing. Takes 30–120 seconds. `course` (from a class's page)
+ * tells Claude the document is about that one class.
  */
-export async function readScheduleOnServer(file: PickedFile, deviceId: string): Promise<ImportResponse> {
-  if (process.env.EXPO_PUBLIC_IMPORT_API_URL) return viaServer(process.env.EXPO_PUBLIC_IMPORT_API_URL, file, deviceId);
-  if (!supabase) return viaServer(localServerUrl(), file, deviceId);
+export async function readScheduleOnServer(file: PickedFile, deviceId: string, course: string | null = null): Promise<ImportResponse> {
+  if (process.env.EXPO_PUBLIC_IMPORT_API_URL) return viaServer(process.env.EXPO_PUBLIC_IMPORT_API_URL, file, deviceId, course);
+  if (!supabase) return viaServer(localServerUrl(), file, deviceId, course);
 
   const { data: session } = await supabase.auth.getSession();
   if (!session.session) {
     return { ok: false, error: 'Sign in first (side panel → Account): imports use your Daybook account.' };
   }
   const { data, error } = await supabase.functions.invoke<ImportResponse>('import-schedule', {
-    body: { ...file, today: todayKey() },
+    body: { ...file, course, today: todayKey() },
   });
   if (!error && data) return data;
   if (error instanceof FunctionsHttpError) {

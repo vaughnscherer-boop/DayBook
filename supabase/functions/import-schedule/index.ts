@@ -44,13 +44,14 @@ Deno.serve(async (req) => {
   const user = auth.user;
   if (!user) return fail(401, 'Sign in to Daybook (side panel → Account) to import a syllabus.');
 
-  let body: { fileName?: unknown; mediaType?: unknown; data?: unknown; today?: unknown };
+  let body: { fileName?: unknown; mediaType?: unknown; data?: unknown; today?: unknown; course?: unknown };
   try {
     body = await req.json();
   } catch {
     return fail(400, 'The upload didn’t arrive in one piece — please try again.');
   }
   const { fileName, mediaType, data, today } = body;
+  const course = typeof body.course === 'string' && body.course.trim() ? body.course.trim().slice(0, 120) : null;
   if (typeof data !== 'string' || typeof mediaType !== 'string' || typeof today !== 'string') {
     return fail(400, 'Missing file.');
   }
@@ -71,6 +72,7 @@ Deno.serve(async (req) => {
     const result = await readSchedule({
       data,
       mediaType,
+      course,
       fileName: name,
       today: /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : new Date().toISOString().slice(0, 10),
       effort: 'medium',

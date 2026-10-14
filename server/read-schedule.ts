@@ -59,6 +59,8 @@ export async function readSchedule(input: {
   mediaType: string;
   fileName: string;
   today: string; // 'YYYY-MM-DD' on the student's device
+  /** Set when importing from a class's page: the document is about this one class. */
+  course?: string | null;
   /** How hard Claude thinks: 'medium' is faster (hosted functions have a time limit), 'high' more thorough. */
   effort?: 'medium' | 'high';
   /** Gives up (with a friendly error) when this fires. */
@@ -99,7 +101,17 @@ export async function readSchedule(input: {
             role: 'user',
             content: [
               file,
-              { type: 'text', text: `File name: ${input.fileName}\nToday's date: ${input.today}` },
+              {
+                type: 'text',
+                text: [
+                  `File name: ${input.fileName}`,
+                  `Today's date: ${input.today}`,
+                  input.course &&
+                    `This document is for the student's class "${input.course}": return exactly one course for it, using that name, and put everything under it.`,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
+              },
             ],
           },
         ],

@@ -9,8 +9,10 @@ import { DeviceCalendarSync } from '@/components/device-calendar-sync';
 import { FeedSync } from '@/components/feed-sync';
 import { GoogleSync } from '@/components/google-sync';
 import { NotificationSync } from '@/components/notification-sync';
+import { PastDuePrompt } from '@/components/past-due-prompt';
+import { BackArrow, isWeb } from '@/components/ui/back-arrow';
 import { SyncProvider } from '@/components/sync-provider';
-import { Colors } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { migrateDbIfNeeded } from '@/db/migrations';
 
 SplashScreen.preventAutoHideAsync();
@@ -32,6 +34,18 @@ function navTheme(base: typeof DefaultTheme, colors: (typeof Colors)['light' | '
 const LightNav = navTheme(DefaultTheme, Colors.light);
 const DarkNav = navTheme(DarkTheme, Colors.dark);
 
+/**
+ * On the computer every screen gets the same back arrow in place of its own Back / Close / Cancel,
+ * and buttons on the right (Add, Done, Select) sit as far in from the edge as the arrow does.
+ */
+const screenOptions = isWeb
+  ? {
+      headerLeft: () => <BackArrow />,
+      headerBackVisible: false,
+      headerRightContainerStyle: { paddingRight: Spacing.three },
+    }
+  : undefined;
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (
@@ -44,7 +58,8 @@ export default function RootLayout() {
           <DeviceCalendarSync />
           <GoogleSync />
           <FeedSync />
-          <Stack>
+          <PastDuePrompt />
+          <Stack screenOptions={screenOptions}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="event/[id]" options={{ presentation: 'modal' }} />
             <Stack.Screen name="task/[id]" options={{ presentation: 'modal' }} />

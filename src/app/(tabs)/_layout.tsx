@@ -2,7 +2,7 @@ import { TabList, Tabs, TabSlot, TabTrigger } from 'expo-router/ui';
 
 import { BottomBar } from '@/components/bottom-bar';
 
-/** Home · Brief · Plan tomorrow · Calendar, switched from a floating bar with a + in the middle. */
+/** Home · Brief · New tasks · Calendar, switched from a floating bar with a + in the middle. */
 export default function TabsLayout() {
   return (
     <Tabs>

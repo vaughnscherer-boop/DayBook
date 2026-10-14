@@ -7,6 +7,7 @@ import { AccountSection } from '@/components/account-section';
 import { CalendarList } from '@/components/calendar-list';
 import { GoogleCalendars } from '@/components/google-calendars';
 import { NotificationSettings } from '@/components/notification-settings';
+import { PastDueSetting } from '@/components/past-due-setting';
 import { PhoneCalendars } from '@/components/phone-calendars';
 import { SchoolFeeds } from '@/components/school-feeds';
 import { TermsSection } from '@/components/terms-section';
@@ -42,6 +43,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {section('CALENDARS', <CalendarList calendars={calendars} groups={groups} onChanged={changed} />)}
         {section('SCHOOL SITES', <SchoolFeeds calendars={calendars} onChanged={changed} />)}
+        {section('TASKS', <PastDueSetting />)}
         {section('TERMS', <TermsSection groups={groups} onChanged={changed} />)}
         {section('GOOGLE CALENDAR', <GoogleCalendars calendars={calendars} />)}
         {deviceCalendarsAvailable &&

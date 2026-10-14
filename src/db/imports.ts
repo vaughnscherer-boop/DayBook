@@ -8,12 +8,52 @@ import { findOrCreateTerm } from '@/db/terms';
 import { createTask } from '@/db/tasks';
 import { tokens } from '@/lib/grouping';
 import type { ItemType } from '@/lib/item-type';
-import type { ImportPlan } from '@/lib/import-schedule';
+import { courseLabel, type ImportPlan } from '@/lib/import-schedule';
+import type { ScheduleCourse, ScheduleImport } from '@/lib/schedule-format';
 
 export type ImportRecord = { id: string; title: string; file_name: string | null; created_at: string };
 
+/** What `imports.schedule` holds: the read, and the group each course went into (null = skipped). */
+type SavedRead = { schedule: ScheduleImport; courseGroups: (string | null)[] };
+
 export async function listImports(db: SQLiteDatabase): Promise<ImportRecord[]> {
-  return db.getAllAsync<ImportRecord>('SELECT * FROM imports ORDER BY created_at DESC');
+  return db.getAllAsync<ImportRecord>('SELECT id, title, file_name, created_at FROM imports ORDER BY created_at DESC');
+}
+
+/** The imports that added something to one class, newest first. */
+export async function listGroupImports(db: SQLiteDatabase, groupId: string): Promise<ImportRecord[]> {
+  return db.getAllAsync<ImportRecord>(
+    `SELECT id, title, file_name, created_at FROM imports WHERE id IN (
+       SELECT import_id FROM events WHERE group_id = ? UNION SELECT import_id FROM tasks WHERE group_id = ?
+       UNION SELECT import_id FROM groups WHERE id = ?)
+     ORDER BY created_at DESC`,
+    groupId,
+    groupId,
+    groupId
+  );
+}
+
+/** This class as Claude read it from each of its imported documents (imports from before reads were kept have none). */
+export async function savedCourseReads(db: SQLiteDatabase, groupId: string, groupName: string): Promise<ScheduleCourse[]> {
+  const rows = await db.getAllAsync<{ schedule: string | null }>(
+    `SELECT schedule FROM imports WHERE schedule IS NOT NULL AND id IN (
+       SELECT import_id FROM events WHERE group_id = ? UNION SELECT import_id FROM tasks WHERE group_id = ?
+       UNION SELECT import_id FROM groups WHERE id = ?)
+     ORDER BY created_at`,
+    groupId,
+    groupId,
+    groupId
+  );
+  return rows.flatMap((row) => {
+    try {
+      const saved = JSON.parse(row.schedule!) as SavedRead;
+      return saved.schedule.courses.filter(
+        (course, i) => saved.courseGroups[i] === groupId || courseLabel(course).toLowerCase() === groupName.toLowerCase()
+      );
+    } catch {
+      return [];
+    }
+  });
 }
 
 /** Shared words over all words: 1 for the same title, 0 for nothing in common. */
@@ -66,7 +106,15 @@ async function addGrading(db: SQLiteDatabase, groupId: string, grading: ImportPl
 export async function saveImport(
   db: SQLiteDatabase,
   plan: ImportPlan,
-  input: { title: string; fileName: string | null; calendarId: string }
+  input: {
+    title: string;
+    fileName: string | null;
+    calendarId: string;
+    /** What Claude read, kept for "Fix mistakes". */
+    schedule?: ScheduleImport;
+    /** Importing from a class's page: every course goes into this group. */
+    intoGroupId?: string;
+  }
 ): Promise<{ importId: string; added: number; updated: number }> {
   const importId = randomUUID();
   let added = 0;
@@ -92,7 +140,9 @@ export async function saveImport(
     const termId = plan.term ? await findOrCreateTerm(db, plan.term, plan.term.breaks) : null;
     const groupIds = new Map<number, string>();
     for (const group of plan.groups) {
-      const same = existing.find((g) => g.name.toLowerCase() === group.name.toLowerCase());
+      const same = input.intoGroupId
+        ? existing.find((g) => g.id === input.intoGroupId)
+        : existing.find((g) => g.name.toLowerCase() === group.name.toLowerCase());
       if (same) {
         // Keep its color and items; learn the course's words and mark it a course.
         const keywords = [...new Set([...JSON.parse(same.keywords), ...group.keywords])];
@@ -210,6 +260,13 @@ export async function saveImport(
     }
     // A re-import that only filled in descriptions has nothing of its own to undo.
     if (added === 0) await db.runAsync('DELETE FROM imports WHERE id = ?', importId);
+    else if (input.schedule) {
+      const saved: SavedRead = {
+        schedule: input.schedule,
+        courseGroups: input.schedule.courses.map((_, i) => groupIds.get(i) ?? null),
+      };
+      await db.runAsync('UPDATE imports SET schedule = ? WHERE id = ?', JSON.stringify(saved), importId);
+    }
   });
   return { importId, added, updated };
 }

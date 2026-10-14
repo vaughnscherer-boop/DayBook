@@ -8,6 +8,8 @@ export type Settings = {
   lastCalendarId: string | null; // calendar picked in the add box last time
   deviceId: string | null; // random id sent with imports (the server's per-device daily limit)
   onboardingDone: boolean; // the first-launch intro was finished or skipped on this device
+  /** After a task's due time passes: ask whether you did it (true), or clear it without asking. */
+  askAboutPastDue: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -18,10 +20,11 @@ export const DEFAULT_SETTINGS: Settings = {
   lastCalendarId: null,
   deviceId: null,
   onboardingDone: false,
+  askAboutPastDue: true,
 };
 
-/** Reminder settings sync across devices (table `preferences`); the rest stay on this device. */
-const SYNCED: readonly (keyof Settings)[] = ['morningTime', 'nightTime', 'morningEnabled', 'nightEnabled'];
+/** Reminder and past-due settings sync across devices (table `preferences`); the rest stay on this device. */
+const SYNCED: readonly (keyof Settings)[] = ['morningTime', 'nightTime', 'morningEnabled', 'nightEnabled', 'askAboutPastDue'];
 
 /** Reads all settings, filling in defaults for anything never saved. Values are stored as JSON. */
 export async function getSettings(db: SQLiteDatabase): Promise<Settings> {

@@ -1,5 +1,5 @@
 import { itemsOnDay, type CalendarItem } from '@/lib/calendar-items';
-import { shiftKey } from '@/lib/dates';
+import { shiftKey, toDateTimeKey } from '@/lib/dates';
 
 export type TaskFilter = 'open' | 'due' | 'tests' | 'overdue';
 export type OverviewRange = 'week' | 'twoWeeks' | 'month';
@@ -27,8 +27,17 @@ export function loadRange(today: string, days: number): [string, string] {
   return [shiftKey(today, -LOOKBACK_DAYS), shiftKey(today, days - 1)];
 }
 
-/** The items a filter shows, soonest first. `days` is the look-ahead from today. */
-export function filterItems(items: CalendarItem[], filter: TaskFilter, today: string, days: number): CalendarItem[] {
+/**
+ * The items a filter shows, soonest first. `days` is the look-ahead from today; `now` ('HH:MM')
+ * makes a task due earlier today at a set time count as overdue.
+ */
+export function filterItems(
+  items: CalendarItem[],
+  filter: TaskFilter,
+  today: string,
+  days: number,
+  now = toDateTimeKey(new Date()).slice(11, 16)
+): CalendarItem[] {
   const end = shiftKey(today, days - 1);
   const ahead = (item: CalendarItem) => item.startDay >= today && item.startDay <= end;
   const unfinishedTask = (item: CalendarItem) => item.kind === 'task' && !item.done;
@@ -41,7 +50,7 @@ export function filterItems(items: CalendarItem[], filter: TaskFilter, today: st
       case 'tests':
         return item.itemType === 'exam' && ahead(item);
       case 'overdue':
-        return unfinishedTask(item) && item.startDay < today;
+        return unfinishedTask(item) && (item.startDay < today || (item.startDay === today && !!item.time && item.time <= now));
     }
   });
   return picked.sort(

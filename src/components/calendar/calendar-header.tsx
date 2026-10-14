@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui/chip';
 import { Icon } from '@/components/ui/icon';
-import { PressableScale } from '@/components/ui/pressable-scale';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -26,22 +25,7 @@ type Props = {
   onNext: () => void;
   onToday: () => void;
   onTitlePress: () => void;
-  onAdd: () => void;
 };
-
-/** Round outlined icon button, like the pin's "+" and back buttons. */
-function CircleButton({ icon, label, onPress }: { icon: 'add' | 'back' | 'forward'; label: string; onPress: () => void }) {
-  const theme = useTheme();
-  return (
-    <PressableScale
-      onPress={onPress}
-      hitSlop={6}
-      accessibilityLabel={label}
-      style={[styles.circle, { borderColor: theme.text }]}>
-      <Icon name={icon} size={icon === 'add' ? 18 : 15} weight="semibold" color={theme.text} />
-    </PressableScale>
-  );
-}
 
 export function CalendarHeader(props: Props) {
   const theme = useTheme();
@@ -90,7 +74,6 @@ export function CalendarHeader(props: Props) {
         {prev}
         {props.wide && today}
         {next}
-        <CircleButton icon="add" label="New event" onPress={props.onAdd} />
       </View>
       {/* Phones: the view pills and Today get their own row so nothing overflows at 390pt. */}
       {!props.wide && (
@@ -107,14 +90,6 @@ export function CalendarHeader(props: Props) {
 const styles = StyleSheet.create({
   container: { gap: Spacing.three, paddingHorizontal: Spacing.three, paddingTop: Spacing.two, paddingBottom: Spacing.three },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  circle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   titleButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, flexShrink: 1 },
   subtitle: { fontWeight: 500, letterSpacing: 0 },
   title: { fontSize: 28, lineHeight: 34, fontWeight: 800, letterSpacing: -0.8 },

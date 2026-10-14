@@ -28,6 +28,7 @@ export type Task = {
   feed_id: string | null; // the school-site feed that added it
   feed_uid: string | null; // that site's own id for it
   feed_hash: string | null; // the feed's version when last applied
+  missed_at: string | null; // when you said you hadn't done it after it was due (it stays, in Overdue)
   created_at: string;
   updated_at: string;
 };

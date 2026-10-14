@@ -83,7 +83,7 @@ export function NotificationSettings() {
 
       <Section
         title="Nightly check-in"
-        description="Asks what’s on for tomorrow. Tap it, list what you need to do, and Daybook puts it on your calendar."
+        description="Asks about new tasks coming up. Tap it, list what you found out about (for tomorrow or later), and Daybook puts it on your calendar."
         enabled={settings.nightEnabled}
         onToggle={(on) => update('nightEnabled', on)}
         time={settings.nightTime}

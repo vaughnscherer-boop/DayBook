@@ -51,8 +51,8 @@ export async function ensurePermission(): Promise<boolean> {
 
 function nightContent(): Notifications.NotificationContentInput {
   return {
-    title: "What's on for tomorrow?",
-    body: 'Tap to jot down what you need to do tomorrow — Daybook puts it on your calendar.',
+    title: 'New tasks coming up?',
+    body: 'Tap to jot down what’s coming — tomorrow or later this week — and Daybook puts it on your calendar.',
     data: { url: '/tomorrow' },
   };
 }

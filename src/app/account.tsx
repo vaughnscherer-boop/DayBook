@@ -7,6 +7,7 @@ import { SignInForm } from '@/components/sign-in-form';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
+import { nativeOnly } from '@/components/ui/back-arrow';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/confirm';
@@ -35,11 +36,11 @@ export default function AccountScreen() {
       <Stack.Screen
         options={{
           title: 'Account',
-          headerLeft: () => (
+          headerLeft: nativeOnly(() => (
             <Pressable onPress={close} hitSlop={8}>
               <ThemedText style={{ color: theme.accent }}>Close</ThemedText>
             </Pressable>
-          ),
+          )),
         }}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

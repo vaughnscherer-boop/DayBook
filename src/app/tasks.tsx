@@ -1,18 +1,24 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { groupNames, ItemCard, typeLabel } from '@/components/item-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Icon } from '@/components/ui/icon';
 import { Spacing } from '@/constants/theme';
-import { setOccurrenceDone, setTaskDone } from '@/db/tasks';
+import { addEventException, deleteEvent } from '@/db/events';
+import { addTaskException, deleteTask, setOccurrenceDone, setTaskDone } from '@/db/tasks';
 import { useCalendarData } from '@/hooks/use-calendar-data';
+import { useTheme } from '@/hooks/use-theme';
 import type { CalendarItem } from '@/lib/calendar-items';
+import { confirmDestructive } from '@/lib/confirm';
 import { formatShortTime, fromKey, todayKey } from '@/lib/dates';
+import { redundantItems } from '@/lib/duplicates';
 import { rescheduleAll } from '@/lib/notifications';
 import { FILTERS, filterItems, loadRange, rangeDays, RANGES, type OverviewRange, type TaskFilter } from '@/lib/overview';
 
@@ -23,9 +29,16 @@ const EMPTY: Record<TaskFilter, string> = {
   overdue: 'Nothing overdue.',
 };
 
-/** Open tasks, what's due soon, upcoming tests and overdue tasks, opened from Home's tiles. */
+/**
+ * Open tasks, what's due soon, upcoming tests and overdue tasks, opened from Home's tiles. "Select"
+ * picks several to delete at once, and "Select duplicates" picks the extra copies of the same item.
+ */
 export default function TasksScreen() {
   const db = useSQLiteContext();
+  const theme = useTheme();
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   const params = useLocalSearchParams<{ filter?: TaskFilter; range?: OverviewRange }>();
   const [filter, setFilter] = useState<TaskFilter>(params.filter ?? 'open');
   const range: OverviewRange = RANGES.some((r) => r.value === params.range) ? params.range! : 'week';
@@ -39,6 +52,43 @@ export default function TasksScreen() {
     [itemsBetween, start, end, filter, today, days]
   );
   const groupName = useMemo(() => groupNames(groups), [groups]);
+  const redundant = useMemo(() => redundantItems(list), [list]);
+
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+  const pick = (item: CalendarItem) => {
+    const next = new Set(selected);
+    if (next.has(item.key)) next.delete(item.key);
+    else next.add(item.key);
+    setSelected(next);
+  };
+  const chosen = list.filter((item) => selected.has(item.key));
+
+  // A repeating item loses just that day; anything else is deleted.
+  const removeSelected = () =>
+    confirmDestructive(
+      `Delete ${chosen.length} item${chosen.length === 1 ? '' : 's'}?`,
+      'Repeating ones lose just that day.',
+      'Delete',
+      async () => {
+        setDeleting(true);
+        await db.withTransactionAsync(async () => {
+          for (const item of chosen) {
+            if (item.kind === 'task') {
+              if (item.repeating) await addTaskException(db, item.id, item.occurrenceDate);
+              else await deleteTask(db, item.id);
+            } else if (item.repeating) await addEventException(db, item.id, item.occurrenceDate);
+            else await deleteEvent(db, item.id);
+          }
+        });
+        setDeleting(false);
+        stopSelecting();
+        await reload();
+        rescheduleAll(db);
+      }
+    );
 
   const toggle = async (item: CalendarItem) => {
     if (item.repeating) await setOccurrenceDone(db, item.id, item.occurrenceDate, !item.done);
@@ -61,6 +111,21 @@ export default function TasksScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <Stack.Screen
+        options={{
+          headerRight: () =>
+            list.length > 0 || selecting ? (
+              <Pressable
+                onPress={() => (selecting ? stopSelecting() : setSelecting(true))}
+                hitSlop={8}
+                accessibilityRole="button">
+                <ThemedText type={selecting ? 'smallBold' : 'small'} style={{ color: theme.accent }}>
+                  {selecting ? 'Done' : 'Select'}
+                </ThemedText>
+              </Pressable>
+            ) : null,
+        }}
+      />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -71,7 +136,10 @@ export default function TasksScreen() {
             key={option.value}
             label={option.label}
             selected={filter === option.value}
-            onPress={() => setFilter(option.value)}
+            onPress={() => {
+              setFilter(option.value);
+              setSelected(new Set());
+            }}
           />
         ))}
       </ScrollView>
@@ -85,19 +153,65 @@ export default function TasksScreen() {
           <EmptyState text={EMPTY[filter]} />
         ) : (
           list.map((item) => (
-            <View key={item.key}>
-              <ItemCard
-                item={item}
-                subtitle={[item.groupId ? groupName[item.groupId] : null, typeLabel(item), when(item)]
-                  .filter(Boolean)
-                  .join('  ·  ')}
-                onOpen={() => open(item)}
-                onToggle={() => toggle(item)}
-              />
+            <View key={item.key} style={styles.row}>
+              {selecting && (
+                <Pressable
+                  onPress={() => pick(item)}
+                  hitSlop={8}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected.has(item.key) }}
+                  accessibilityLabel={`Select ${item.title}`}>
+                  <Icon
+                    name={selected.has(item.key) ? 'checked' : 'unchecked'}
+                    size={24}
+                    color={selected.has(item.key) ? theme.danger : theme.textSecondary}
+                  />
+                </Pressable>
+              )}
+              <View style={styles.flex}>
+                <ItemCard
+                  item={item}
+                  subtitle={[item.groupId ? groupName[item.groupId] : null, typeLabel(item), when(item)]
+                    .filter(Boolean)
+                    .join('  ·  ')}
+                  onOpen={() => (selecting ? pick(item) : open(item))}
+                  onToggle={() => (selecting ? pick(item) : toggle(item))}
+                />
+              </View>
             </View>
           ))
         )}
       </ScrollView>
+      {selecting && (
+        <ThemedView style={[styles.footer, { borderColor: theme.backgroundSelected }]}>
+          <View style={styles.quick}>
+            <Pressable
+              onPress={() => setSelected(new Set(redundant.map((item) => item.key)))}
+              disabled={redundant.length === 0}
+              hitSlop={6}
+              accessibilityRole="button">
+              <ThemedText type="small" style={{ color: redundant.length ? theme.accent : theme.textSecondary }}>
+                {redundant.length ? `Select duplicates (${redundant.length})` : 'No duplicates'}
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setSelected(chosen.length === list.length ? new Set() : new Set(list.map((item) => item.key)))}
+              hitSlop={6}
+              accessibilityRole="button">
+              <ThemedText type="small" style={{ color: theme.accent }}>
+                {chosen.length === list.length && list.length > 0 ? 'Select none' : 'Select all'}
+              </ThemedText>
+            </Pressable>
+          </View>
+          <Button
+            title={chosen.length ? `Delete ${chosen.length}` : 'Delete'}
+            onPress={removeSelected}
+            disabled={chosen.length === 0}
+            busy={deleting}
+            style={chosen.length ? { backgroundColor: theme.danger } : undefined}
+          />
+        </ThemedView>
+      )}
     </ThemedView>
   );
 }
@@ -108,4 +222,8 @@ const styles = StyleSheet.create({
   filters: { gap: Spacing.two, paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
   rangeNote: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two },
   list: { padding: Spacing.three, gap: Spacing.two + 4, paddingBottom: Spacing.six },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  flex: { flex: 1 },
+  footer: { padding: Spacing.three, gap: Spacing.two, borderTopWidth: StyleSheet.hairlineWidth },
+  quick: { flexDirection: 'row', justifyContent: 'space-between' },
 });

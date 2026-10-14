@@ -36,8 +36,8 @@ export default function NewScreen() {
   const add = async ({ kind, parsed, calendarId: target, notes }: NewEntry) => {
     await createFromParsed(db, kind, parsed, target, notes);
     rescheduleAll(db);
-    // Show where it landed.
-    router.back();
+    // Show where it landed (straight there when this sheet was opened by its link).
+    if (router.canGoBack()) router.back();
     router.navigate({ pathname: '/calendar', params: { date: parsed.starts_at.slice(0, 10) } });
   };
 
@@ -51,7 +51,7 @@ export default function NewScreen() {
     </Pressable>
   );
   const replaceWith = (href: Parameters<typeof router.push>[0]) => {
-    router.back();
+    if (router.canGoBack()) router.back();
     router.push(href);
   };
 

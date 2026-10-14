@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -22,6 +22,8 @@ type Props = {
   /** Items from today through the exam's day, so busy times and earlier sessions are known. */
   items: CalendarItem[];
   onChanged: () => void;
+  /** Shown under the heading: the class page's picker of what to study for. */
+  picker?: ReactNode;
 };
 
 const range = (session: StudySession) =>
@@ -31,7 +33,7 @@ const range = (session: StudySession) =>
  * "Plan study sessions" for an exam: proposes a few hour-long sessions in free time before it. You
  * can drop any you don't want, then add the rest as "Study: <exam>" events (edit them like any event).
  */
-export function StudyPlanner({ exam, calendarId, items, onChanged }: Props) {
+export function StudyPlanner({ exam, calendarId, items, onChanged, picker }: Props) {
   const db = useSQLiteContext();
   const theme = useTheme();
   const [proposal, setProposal] = useState<StudySession[] | null>(null);
@@ -66,6 +68,7 @@ export function StudyPlanner({ exam, calendarId, items, onChanged }: Props) {
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       <ThemedText type="smallBold">Study plan</ThemedText>
+      {picker}
       {planned.map((session) => (
         <Pressable
           key={session.key}
@@ -87,7 +90,7 @@ export function StudyPlanner({ exam, calendarId, items, onChanged }: Props) {
         <View style={styles.proposal}>
           {proposal.length === 0 ? (
             <ThemedText type="small" themeColor="textSecondary">
-              {planned.length > 0 ? 'That’s all the sessions this exam needs.' : 'No free time found before this exam.'}
+              {planned.length > 0 ? 'That’s all the sessions this needs.' : 'No free time found before it’s due.'}
             </ThemedText>
           ) : (
             proposal.map((session) => (

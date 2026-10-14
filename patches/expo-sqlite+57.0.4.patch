@@ -1,0 +1,58 @@
+diff --git a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
+index 046fe6f..e4d0608 100644
+--- a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
++++ b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
+@@ -23,6 +23,9 @@ const PERSISTENT_FILE_TYPES =
+   VFS.SQLITE_OPEN_WAL;
+ 
+ const DEFAULT_CAPACITY = 6;
++// Waiting out a reload that still holds the files: up to 20 tries, a quarter second apart.
++const ACQUIRE_RETRIES = 20;
++const ACQUIRE_RETRY_MS = 250;
+ 
+ /**
+  * This VFS uses the updated Access Handle API with all synchronous methods
+@@ -229,7 +232,21 @@ export class AccessHandlePoolVFS extends FacadeVFS {
+       }
+       this.#directoryHandle = handle;
+ 
+-      await this.#acquireAccessHandles();
++      // The page this one replaces (a reload) can still hold the files for a moment: retry for
++      // a few seconds before giving up. A second open tab keeps holding them, so that still fails.
++      for (let attempt = 0; ; attempt++) {
++        try {
++          await this.#acquireAccessHandles();
++          break;
++        } catch (e) {
++          this.#releaseAccessHandles();
++          if (e?.name !== 'NoModificationAllowedError' || attempt >= ACQUIRE_RETRIES) {
++            this.#directoryHandle = null;
++            throw e;
++          }
++          await new Promise((resolve) => setTimeout(resolve, ACQUIRE_RETRY_MS));
++        }
++      }
+       if (this.getCapacity() === 0) {
+         await this.addCapacity(DEFAULT_CAPACITY);
+       }
+@@ -301,8 +318,9 @@ export class AccessHandlePoolVFS extends FacadeVFS {
+       }
+     }
+ 
+-    // Open access handles in parallel, separating associated and unassociated.
+-    await Promise.all(
++    // Open access handles in parallel, separating associated and unassociated. Wait for all of
++    // them, so a failure doesn't leave handles still opening after they've been released.
++    const results = await Promise.allSettled(
+       files.map(async ([name, handle]) => {
+         const accessHandle = await handle.createSyncAccessHandle();
+         this.#mapAccessHandleToName.set(accessHandle, name);
+@@ -314,6 +332,8 @@ export class AccessHandlePoolVFS extends FacadeVFS {
+         }
+       })
+     );
++    const failed = results.find((result) => result.status === 'rejected');
++    if (failed) throw failed.reason;
+   }
+ 
+   #releaseAccessHandles() {

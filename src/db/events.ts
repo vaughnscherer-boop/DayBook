@@ -124,3 +124,21 @@ export async function addEventException(db: SQLiteDatabase, id: string, date: st
     id
   );
 }
+
+/** Every event in the same calendar with the same name as `event` (itself included), ignoring case and spacing. */
+export async function sameNamedEvents(db: SQLiteDatabase, event: CalendarEvent): Promise<CalendarEvent[]> {
+  const rows = await db.getAllAsync<CalendarEvent>(
+    'SELECT * FROM events WHERE calendar_id IS ? AND lower(trim(title)) = lower(trim(?))',
+    event.calendar_id,
+    event.title
+  );
+  const name = (title: string) => title.trim().toLowerCase().replace(/\s+/g, ' ');
+  return rows.filter((row) => name(row.title) === name(event.title));
+}
+
+/** Deletes several events (and every date of any repeating ones) at once. */
+export async function deleteEvents(db: SQLiteDatabase, ids: string[]) {
+  await db.withTransactionAsync(async () => {
+    for (const id of ids) await deleteEvent(db, id);
+  });
+}

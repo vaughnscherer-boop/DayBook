@@ -17,10 +17,11 @@ const fade = Platform.select<ViewStyle>({
   default: {},
 });
 
-/** Outlined "Close" pill for modal headers that brightens under the pointer. */
+/** Outlined "Close" pill for modal headers on phones (the computer shows a back arrow instead). */
 export function CloseButton({ onPress = closeModal }: { onPress?: () => void }) {
   const theme = useTheme();
   const [hovered, setHovered] = useState(false);
+  if (Platform.OS === 'web') return null;
 
   return (
     <PressableScale

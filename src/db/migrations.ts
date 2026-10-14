@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const LATEST_VERSION = 15;
+const LATEST_VERSION = 17;
 
 /**
  * Creates/upgrades the database schema. Each time the schema changes, add a new
@@ -391,6 +391,20 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
       CREATE INDEX idx_tasks_feed ON tasks (feed_id);
     `);
     version = 15;
+  }
+
+  if (version < 16) {
+    // What Claude read from each imported document (JSON: the schedule, and which group each course
+    // went into), so "Fix mistakes" can switch you to another section without re-reading it.
+    await db.execAsync(`ALTER TABLE imports ADD COLUMN schedule TEXT;`);
+    version = 16;
+  }
+
+  if (version < 17) {
+    // When you said you hadn't done a task after its due time passed: it stays, in Overdue, and
+    // Daybook doesn't ask about it again.
+    await db.execAsync(`ALTER TABLE tasks ADD COLUMN missed_at TEXT;`);
+    version = 17;
   }
 
   await db.execAsync(`PRAGMA user_version = ${version}`);

@@ -1,5 +1,5 @@
 import { randomUUID } from 'expo-crypto';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -9,9 +9,11 @@ import { ImportCourseCard } from '@/components/import-course-card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
+import { nativeOnly } from '@/components/ui/back-arrow';
 import { EventColors, Spacing } from '@/constants/theme';
 import { createCalendar, listCalendars, type Calendar } from '@/db/calendars';
-import { listImports, saveImport, undoImport, type ImportRecord } from '@/db/imports';
+import { listGroups, type Group } from '@/db/groups';
+import { listGroupImports, listImports, saveImport, undoImport, type ImportRecord } from '@/db/imports';
 import { getSettings, setSetting } from '@/db/settings';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive, notify } from '@/lib/confirm';
@@ -32,8 +34,12 @@ const NEW_SCHOOL = '__new-school__';
 /** Back to the calendar (also when this screen was opened directly by its URL). */
 const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
-/** Import a syllabus or schedule: pick a file, Claude reads it, you review and add it. */
+/**
+ * Import a syllabus or schedule: pick a file, Claude reads it, you review and add it. Opened from a
+ * class's page (`groupId`), it adds the document to that class only.
+ */
 export default function ImportScreen() {
+  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const db = useSQLiteContext();
   const theme = useTheme();
   const [step, setStep] = useState<Step>({ kind: 'start' });
@@ -43,11 +49,14 @@ export default function ImportScreen() {
   const [imports, setImports] = useState<ImportRecord[]>([]);
   const [saving, setSaving] = useState(false);
   const [pasted, setPasted] = useState('');
+  const [course, setCourse] = useState<Group | null>(null);
 
+  const loadImports = () => (groupId ? listGroupImports(db, groupId) : listImports(db));
   useEffect(() => {
     listCalendars(db).then(setCalendars);
-    listImports(db).then(setImports);
-  }, [db]);
+    (groupId ? listGroupImports(db, groupId) : listImports(db)).then(setImports);
+    if (groupId) listGroups(db).then((groups) => setCourse(groups.find((g) => g.id === groupId) ?? null));
+  }, [db, groupId]);
 
   const school = calendars.find((c) => /school|class/i.test(c.name));
 
@@ -78,14 +87,15 @@ export default function ImportScreen() {
       deviceId = randomUUID();
       await setSetting(db, 'deviceId', deviceId);
     }
-    const result = await readScheduleOnServer(file, deviceId);
+    const result = await readScheduleOnServer(file, deviceId, course?.name ?? null);
     if (!result.ok) {
       setStep({ kind: 'start', error: result.error });
       return;
     }
     setChoices(result.schedule.courses.map((course) => defaultChoice(course)));
-    // Classes go in a "School" calendar: an existing one, or a new one made on save.
-    setCalendarId(school?.id ?? NEW_SCHOOL);
+    // Classes go in a "School" calendar: an existing one, or a new one made on save. A class's own
+    // documents go in its calendar.
+    setCalendarId(course?.calendar_id ?? school?.id ?? NEW_SCHOOL);
     setStep({ kind: 'review', fileName: file.fileName, schedule: result.schedule, costUsd: result.costUsd });
   };
 
@@ -114,6 +124,8 @@ export default function ImportScreen() {
       title: step.schedule.title,
       fileName: step.fileName,
       calendarId: target,
+      schedule: step.schedule,
+      intoGroupId: course?.id,
     });
     rescheduleAll(db);
     close();
@@ -130,7 +142,7 @@ export default function ImportScreen() {
     confirmDestructive(`Undo “${record.title}”?`, 'Everything this import added will be removed.', 'Undo import', async () => {
       await undoImport(db, record.id);
       rescheduleAll(db);
-      setImports(await listImports(db));
+      setImports(await loadImports());
     });
 
   const chipCalendars: Calendar[] = school
@@ -145,21 +157,22 @@ export default function ImportScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen
         options={{
-          title: 'Import schedule',
-          headerLeft: () => (
+          title: course ? `Add to ${course.name}` : 'Import schedule',
+          headerLeft: nativeOnly(() => (
             <Pressable onPress={close} hitSlop={8}>
               <ThemedText style={{ color: theme.accent }}>{step.kind === 'review' ? 'Cancel' : 'Close'}</ThemedText>
             </Pressable>
-          ),
+          )),
         }}
       />
 
       {step.kind === 'start' && (
         <ScrollView contentContainerStyle={styles.content}>
-          <ThemedText type="subtitle">Add a syllabus or schedule</ThemedText>
+          <ThemedText type="subtitle">{course ? `Add a document for ${course.name}` : 'Add a syllabus or schedule'}</ThemedText>
           <ThemedText themeColor="textSecondary">
-            Pick a PDF or a screenshot. Daybook reads your class times, exams, homework and breaks, and you choose what to
-            add before anything changes.
+            {course
+              ? 'Pick a syllabus, schedule, assignment sheet or exam guide for this class. Everything Daybook finds goes into this class, and you choose what to add first.'
+              : 'Pick a PDF or a screenshot. Daybook reads your class times, exams, homework and breaks, and you choose what to add before anything changes.'}
           </ThemedText>
           <Button title="Choose file…" onPress={pick} />
           <View style={styles.block}>
@@ -241,12 +254,14 @@ export default function ImportScreen() {
               </ThemedView>
             )}
 
-            <View style={styles.block}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Add to calendar
-              </ThemedText>
-              <CalendarChips calendars={chipCalendars} value={calendarId} onChange={setCalendarId} />
-            </View>
+            {!course && (
+              <View style={styles.block}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Add to calendar
+                </ThemedText>
+                <CalendarChips calendars={chipCalendars} value={calendarId} onChange={setCalendarId} />
+              </View>
+            )}
 
             {step.schedule.courses.map((course, i) => (
               <ImportCourseCard

@@ -1,10 +1,10 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { CalendarChips } from '@/components/calendar-chips';
-import { useChoiceDialog } from '@/components/choice-dialog';
+import { useChoiceDialog, type Choice } from '@/components/choice-dialog';
 import { ColorSwatches } from '@/components/color-swatches';
 import { DateTimeField } from '@/components/date-time-field';
 import { ExamStudy } from '@/components/course/exam-study';
@@ -15,9 +15,11 @@ import { SyllabusDetails } from '@/components/syllabus-details';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TypeChips } from '@/components/type-chips';
+import { nativeOnly } from '@/components/ui/back-arrow';
+import { closeModal } from '@/components/ui/close-button';
 import { Spacing } from '@/constants/theme';
 import { listCalendars, type Calendar } from '@/db/calendars';
-import { addEventException, createEvent, deleteEvent, getEvent, updateEvent } from '@/db/events';
+import { addEventException, createEvent, deleteEvent, deleteEvents, getEvent, sameNamedEvents, updateEvent } from '@/db/events';
 import { learnFromPlacement, listGroups, type Group, type GroupChoice } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive, notify } from '@/lib/confirm';
@@ -133,7 +135,7 @@ export default function EventScreen() {
         await learnFromPlacement(db, groupChoice.groupId, title);
       }
       rescheduleAll(db);
-      router.back();
+      closeModal();
     };
 
     if (isNew) {
@@ -171,27 +173,57 @@ export default function EventScreen() {
     ]);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
+    const done = () => {
+      rescheduleAll(db);
+      closeModal();
+    };
     const removeAll = async () => {
       await deleteEvent(db, id);
-      rescheduleAll(db);
-      router.back();
+      done();
     };
+    // Other events with this name in the same calendar: separate copies of the same class or meeting.
+    const saved = await getEvent(db, id);
+    const same = saved ? await sameNamedEvents(db, saved) : [];
+    const copies: Choice[] =
+      same.length > 1
+        ? [
+            {
+              label: `Delete all ${same.length} “${saved!.title.trim()}” events`,
+              style: 'destructive',
+              onPress: async () => {
+                await deleteEvents(db, same.map((event) => event.id));
+                done();
+              },
+            },
+          ]
+        : [];
+    const fromSite = same.some((event) => event.feed_id !== null);
+    const note = fromSite ? `${title}\n\nOnes from your school site come back when it refreshes.` : title;
+
     if (!series) {
-      confirmDestructive('Delete event?', title, 'Delete', removeAll);
+      if (copies.length === 0) {
+        confirmDestructive('Delete event?', title, 'Delete', removeAll);
+        return;
+      }
+      ask('Delete event?', note, [
+        { label: 'Delete only this event', style: 'destructive', onPress: removeAll },
+        ...copies,
+        { label: 'Cancel', style: 'cancel' },
+      ]);
       return;
     }
-    ask('Delete this repeating event?', title, [
+    ask('Delete this repeating event?', copies.length ? note : title, [
       {
         label: 'Delete only this event',
         style: 'destructive',
         onPress: async () => {
           await addEventException(db, id, series.occurrence);
-          rescheduleAll(db);
-          router.back();
+          done();
         },
       },
-      { label: 'Delete all events', style: 'destructive', onPress: removeAll },
+      { label: 'Delete all events in this series', style: 'destructive', onPress: removeAll },
+      ...copies,
       { label: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -219,11 +251,11 @@ export default function EventScreen() {
       <Stack.Screen
         options={{
           title: isNew ? 'New Event' : 'Edit Event',
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={8}>
+          headerLeft: nativeOnly(() => (
+            <Pressable onPress={closeModal} hitSlop={8}>
               <ThemedText style={{ color: theme.accent }}>Cancel</ThemedText>
             </Pressable>
-          ),
+          )),
           headerRight: () => (
             <Pressable onPress={save} hitSlop={8}>
               <ThemedText type="smallBold" style={[styles.headerButton, { color: theme.accent }]}>

@@ -199,7 +199,6 @@ export default function CalendarScreen() {
           onNext={() => step(1)}
           onToday={() => setFocusedDate(todayKey())}
           onTitlePress={() => setJumpOpen(true)}
-          onAdd={() => router.push({ pathname: '/event/[id]', params: { id: 'new', start: `${focusedDate}T09:00` } })}
         />
         {view === 'month' ? (
           <View style={[styles.month, wide && styles.monthWide]}>

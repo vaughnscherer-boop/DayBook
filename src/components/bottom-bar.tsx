@@ -40,7 +40,7 @@ function TabButton({ icon, focusedIcon, label, isFocused, onPress, ...rest }: Ta
   );
 }
 
-/** Floating tab bar: Home · Brief · + · Plan tomorrow · Calendar. The + opens quick add. */
+/** Floating tab bar: Home · Brief · + · New tasks (the night check-in) · Calendar. The + opens quick add. */
 export function BottomBar() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -65,7 +65,7 @@ export function BottomBar() {
           <Icon name="add" size={26} weight="semibold" color={theme.onAccent} />
         </PressableScale>
         <TabTrigger name="tomorrow" asChild>
-          <TabButton icon="moon" focusedIcon="moonFilled" label="Plan tomorrow" />
+          <TabButton icon="moon" focusedIcon="moonFilled" label="New tasks" />
         </TabTrigger>
         <TabTrigger name="calendar" asChild>
           <TabButton icon="calendar" focusedIcon="calendarFilled" label="Calendar" />
