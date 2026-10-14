@@ -46,6 +46,7 @@ const LOOKAHEAD_DAYS = 180;
 /** The course groups and their meetings. */
 export function buildClasses(groups: Group[], events: CalendarEvent[]): ClassInfo[] {
   return groups.flatMap((group) => {
+    if (group.archived) return [];
     const keywords: string[] = JSON.parse(group.keywords);
     const meetings = events.filter((event) => event.group_id === group.id && event.all_day === 0);
     const isCourse =

@@ -18,12 +18,14 @@ type Props = {
   onChanged: () => void;
   /** Show only this group, already open for editing (the Edit sheet from Home's class cards). */
   focusId?: string;
+  /** With `focusId`: open the editor right away (otherwise it starts collapsed). */
+  autoOpen?: boolean;
 };
 
 /** A calendar's groups (made automatically); tap one to rename, recolor, merge or delete it. */
-export function GroupList({ groups, onChanged, focusId }: Props) {
+export function GroupList({ groups, onChanged, focusId, autoOpen = true }: Props) {
   const db = useSQLiteContext();
-  const [editing, setEditing] = useState<string | null>(focusId ?? null);
+  const [editing, setEditing] = useState<string | null>(autoOpen ? (focusId ?? null) : null);
   const shown = focusId ? groups.filter((group) => group.id === focusId) : groups;
   if (shown.length === 0) return null;
 

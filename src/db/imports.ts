@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { createEvent } from '@/db/events';
 import { createGroup, type Group } from '@/db/groups';
+import { findOrCreateTerm } from '@/db/terms';
 import { createTask } from '@/db/tasks';
 import { tokens } from '@/lib/grouping';
 import type { ItemType } from '@/lib/item-type';
@@ -77,6 +78,7 @@ export async function saveImport(
       new Date().toISOString()
     );
 
+    const termId = plan.term ? await findOrCreateTerm(db, plan.term, plan.term.breaks) : null;
     const groupIds = new Map<number, string>();
     for (const group of plan.groups) {
       const same = existing.find((g) => g.name.toLowerCase() === group.name.toLowerCase());
@@ -84,8 +86,12 @@ export async function saveImport(
         // Keep its color and items; learn the course's words and mark it a course.
         const keywords = [...new Set([...JSON.parse(same.keywords), ...group.keywords])];
         await db.runAsync(
-          `UPDATE groups SET keywords = ?, source = 'import', updated_at = ? WHERE id = ?`,
+          `UPDATE groups SET keywords = ?, source = 'import', term_id = COALESCE(?, term_id),
+             location = COALESCE(location, ?), office_hours = COALESCE(office_hours, ?), updated_at = ? WHERE id = ?`,
           JSON.stringify(keywords),
+          termId,
+          group.location,
+          group.office_hours,
           new Date().toISOString(),
           same.id
         );
@@ -97,7 +103,14 @@ export async function saveImport(
           keywords: group.keywords,
           source: 'import',
         });
-        await db.runAsync('UPDATE groups SET import_id = ? WHERE id = ?', importId, id);
+        await db.runAsync(
+          'UPDATE groups SET import_id = ?, term_id = ?, location = ?, office_hours = ? WHERE id = ?',
+          importId,
+          termId,
+          group.location,
+          group.office_hours,
+          id
+        );
         groupIds.set(group.course, id);
       }
     }

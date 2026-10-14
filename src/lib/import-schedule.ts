@@ -3,6 +3,7 @@ import { courseCode, tokens } from '@/lib/grouping';
 import type { ItemType } from '@/lib/item-type';
 import { firstMatchingDay, type RepeatRule } from '@/lib/recurrence';
 import type { ItemKind, MeetingKind, ScheduleCourse, ScheduleImport, ScheduleItem, ScheduleMeeting } from '@/lib/schedule-format';
+import { fitSeriesToTerm, mergeBreaks, type TermBreak } from '@/lib/terms';
 
 /**
  * Turns what Claude read from a syllabus, plus what you ticked on the review screen, into the
@@ -35,8 +36,17 @@ export type TaskDraft = {
   item_type: ItemType;
   details: string | null;
 };
-export type GroupDraft = { course: number; name: string; keywords: string[] };
-export type ImportPlan = { groups: GroupDraft[]; events: EventDraft[]; tasks: TaskDraft[] };
+export type GroupDraft = {
+  course: number;
+  name: string;
+  keywords: string[];
+  /** Where the class meets, and when office hours are, as read from the syllabus. */
+  location: string | null;
+  office_hours: string | null;
+};
+/** The term the syllabus covers, with the breaks it lists. */
+export type TermDraft = { starts_on: string; ends_on: string; breaks: TermBreak[] };
+export type ImportPlan = { groups: GroupDraft[]; events: EventDraft[]; tasks: TaskDraft[]; term: TermDraft | null };
 
 /** Kinds that become tasks to tick off; the rest become calendar events. */
 export const TASK_KINDS: ItemKind[] = ['assignment', 'reading'];
@@ -113,10 +123,39 @@ function classOn(course: ScheduleCourse, choice: CourseChoice, item: ScheduleIte
   return candidates.find((m) => item.section !== null && m.section === item.section) ?? candidates.find((m) => m.section === null) ?? candidates[0] ?? null;
 }
 
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** '14:05' -> '2:05 PM'. */
+function clock12(time: string): string {
+  const h = Number(time.slice(0, 2));
+  return `${h % 12 === 0 ? 12 : h % 12}:${time.slice(3, 5)} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/** "Mon/Wed 2:00 PM–3:15 PM, Room 204" for a meeting. */
+export function describeMeeting(meeting: ScheduleMeeting): string {
+  const days = [...meeting.weekdays].sort().map((d) => WEEKDAY_SHORT[d]).join('/');
+  const where = meeting.location ? `, ${meeting.location}` : '';
+  return `${days} ${clock12(meeting.start_time)}–${clock12(meeting.end_time)}${where}`;
+}
+
 const addHour = (time: string) => `${String(Math.min(Number(time.slice(0, 2)) + 1, 23)).padStart(2, '0')}${time.slice(2)}`;
 
 export function buildImportPlan(schedule: ScheduleImport, choices: CourseChoice[], today: string): ImportPlan {
-  const plan: ImportPlan = { groups: [], events: [], tasks: [] };
+  const plan: ImportPlan = { groups: [], events: [], tasks: [], term: null };
+
+  // The term and its breaks, from every course's "break" items (two syllabi both list Fall Break).
+  if (schedule.term_start && schedule.term_end && schedule.term_start <= schedule.term_end) {
+    const listed: TermBreak[] = schedule.courses.flatMap((course) =>
+      course.items
+        .filter((item) => item.kind === 'break')
+        .map((item) => ({ name: item.title, from: item.date, to: item.end_date && item.end_date > item.date ? item.end_date : item.date }))
+    );
+    plan.term = {
+      starts_on: schedule.term_start,
+      ends_on: schedule.term_end,
+      breaks: mergeBreaks([], listed.filter((b) => b.from >= schedule.term_start! && b.to <= schedule.term_end!)),
+    };
+  }
 
   schedule.courses.forEach((course, c) => {
     const choice = choices[c];
@@ -125,7 +164,15 @@ export function buildImportPlan(schedule: ScheduleImport, choices: CourseChoice[
     if (pickedMeetings.length === 0 && pickedItems.length === 0) return;
 
     const label = courseLabel(course);
-    plan.groups.push({ course: c, name: label, keywords: courseKeywords(course) });
+    const lecture = pickedMeetings.find((m) => m.kind !== 'office_hours' && m.location);
+    const hours = pickedMeetings.filter((m) => m.kind === 'office_hours');
+    plan.groups.push({
+      course: c,
+      name: label,
+      keywords: courseKeywords(course),
+      location: lecture?.location ?? null,
+      office_hours: hours.length ? hours.map(describeMeeting).join('; ') : null,
+    });
 
     for (const meeting of pickedMeetings) {
       const rule: RepeatRule = { freq: 'weekly', interval: 1, weekdays: [...meeting.weekdays].sort() };
@@ -140,8 +187,13 @@ export function buildImportPlan(schedule: ScheduleImport, choices: CourseChoice[
         ends_at: `${first}T${meeting.end_time > meeting.start_time ? meeting.end_time : addHour(meeting.start_time)}`,
         all_day: false,
         repeat: rule,
-        repeat_until: meeting.last_date ?? schedule.term_end,
-        exceptions: meeting.cancelled_dates,
+        // Classes stop at the end of the term and skip its breaks.
+        ...(plan.term
+          ? fitSeriesToTerm(
+              { repeat_until: meeting.last_date ?? schedule.term_end, exceptions: meeting.cancelled_dates },
+              { ends_on: plan.term.ends_on, breaks: JSON.stringify(plan.term.breaks) }
+            )
+          : { repeat_until: meeting.last_date ?? schedule.term_end, exceptions: meeting.cancelled_dates }),
         item_type: MEETING_TYPES[meeting.kind],
         details: null,
       });

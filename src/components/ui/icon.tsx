@@ -39,6 +39,8 @@ const NAMES = {
   class: { ios: 'book.closed', android: 'menu_book', web: 'menu_book' },
   exam: { ios: 'checklist', android: 'checklist', web: 'checklist' },
   assignment: { ios: 'doc.text', android: 'description', web: 'description' },
+  link: { ios: 'link', android: 'link', web: 'link' },
+  person: { ios: 'person', android: 'person', web: 'person' },
   reading: { ios: 'book', android: 'auto_stories', web: 'auto_stories' },
 } as const;
 

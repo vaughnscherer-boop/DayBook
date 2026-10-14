@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const LATEST_VERSION = 12;
+const LATEST_VERSION = 13;
 
 /**
  * Creates/upgrades the database schema. Each time the schema changes, add a new
@@ -294,6 +294,37 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
         WHERE key IN ('morningTime', 'nightTime', 'morningEnabled', 'nightEnabled');
     `);
     version = 12;
+  }
+
+  if (version < 13) {
+    // School terms (with their breaks) and what a course group knows about itself: instructor, room,
+    // office hours and links. Ended terms archive their courses (hidden from Home, items kept).
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const note = (row: 'NEW' | 'OLD') =>
+      `INSERT OR REPLACE INTO sync_outbox (tbl, id, changed_at) VALUES ('terms', ${row}.id, ${now});`;
+    const when = 'WHEN (SELECT applying FROM sync_meta) = 0';
+    await db.execAsync(`
+      CREATE TABLE terms (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        starts_on TEXT NOT NULL,      -- 'YYYY-MM-DD'
+        ends_on TEXT NOT NULL,        -- 'YYYY-MM-DD'
+        breaks TEXT NOT NULL DEFAULT '[]', -- JSON [{ name, from, to }] ('YYYY-MM-DD', inclusive)
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TRIGGER sync_terms_insert AFTER INSERT ON terms ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_terms_update AFTER UPDATE ON terms ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_terms_delete AFTER DELETE ON terms ${when} BEGIN ${note('OLD')} END;
+
+      ALTER TABLE groups ADD COLUMN term_id TEXT;
+      ALTER TABLE groups ADD COLUMN instructor TEXT;
+      ALTER TABLE groups ADD COLUMN location TEXT;
+      ALTER TABLE groups ADD COLUMN office_hours TEXT;
+      ALTER TABLE groups ADD COLUMN links TEXT NOT NULL DEFAULT '[]'; -- JSON [{ label, url }]
+      ALTER TABLE groups ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
+    `);
+    version = 13;
   }
 
   await db.execAsync(`PRAGMA user_version = ${version}`);

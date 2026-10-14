@@ -8,6 +8,7 @@ import { CalendarList } from '@/components/calendar-list';
 import { GoogleCalendars } from '@/components/google-calendars';
 import { NotificationSettings } from '@/components/notification-settings';
 import { PhoneCalendars } from '@/components/phone-calendars';
+import { TermsSection } from '@/components/terms-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { CloseButton } from '@/components/ui/close-button';
@@ -39,6 +40,7 @@ export default function SettingsScreen() {
       <Stack.Screen options={{ headerRight: () => <CloseButton /> }} />
       <ScrollView contentContainerStyle={styles.content}>
         {section('CALENDARS', <CalendarList calendars={calendars} groups={groups} onChanged={changed} />)}
+        {section('TERMS', <TermsSection groups={groups} onChanged={changed} />)}
         {section('GOOGLE CALENDAR', <GoogleCalendars calendars={calendars} />)}
         {deviceCalendarsAvailable &&
           section('PHONE CALENDARS', <PhoneCalendars calendars={calendars} onChanged={changed} />)}

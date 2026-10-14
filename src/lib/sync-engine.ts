@@ -37,6 +37,7 @@ const TABLES: Record<string, { key: string[]; changedColumn: string }> = {
   events: { key: ['id'], changedColumn: 'updated_at' },
   preferences: { key: ['name'], changedColumn: 'updated_at' },
   tasks: { key: ['id'], changedColumn: 'updated_at' },
+  terms: { key: ['id'], changedColumn: 'updated_at' },
   task_completions: { key: ['task_id', 'date'], changedColumn: 'completed_at' },
   imports: { key: ['id'], changedColumn: 'created_at' },
 };

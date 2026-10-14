@@ -13,9 +13,26 @@ export type Group = {
   keywords: string; // JSON array of lowercase words/phrases
   source: 'auto' | 'user' | 'import';
   type_shades: string; // JSON { [ItemType]: shade step }, over DEFAULT_SHADES
+  term_id: string | null;
+  instructor: string | null;
+  location: string | null;
+  office_hours: string | null;
+  links: string; // JSON CourseLink[]
+  archived: 0 | 1; // 1 = its term ended: hidden from Home, items kept
   created_at: string;
   updated_at: string;
 };
+
+export type CourseLink = { label: string; url: string };
+
+export function parseLinks(json: string | null | undefined): CourseLink[] {
+  try {
+    const list = JSON.parse(json || '[]');
+    return Array.isArray(list) ? list.filter((l) => l && typeof l.url === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 /** How an item's group was chosen: 'auto' lets the rules decide; a group id (or null = none) is a hand pick. */
 export type GroupChoice = 'auto' | { groupId: string | null };
@@ -117,6 +134,30 @@ export async function updateGroup(
       id
     );
   }
+}
+
+/**
+ * The course details shown on its page. Empty text clears a field. Writes only the fields given, in
+ * one statement, so two quick edits (leaving a text box, then picking a term) can't undo each other.
+ */
+export async function updateCourseInfo(
+  db: SQLiteDatabase,
+  id: string,
+  info: Partial<{ instructor: string; location: string; officeHours: string; links: CourseLink[]; termId: string | null }>
+) {
+  const sets: string[] = [];
+  const values: (string | null)[] = [];
+  const set = (column: string, value: string | null) => {
+    sets.push(`${column} = ?`);
+    values.push(value);
+  };
+  if (info.instructor !== undefined) set('instructor', info.instructor.trim() || null);
+  if (info.location !== undefined) set('location', info.location.trim() || null);
+  if (info.officeHours !== undefined) set('office_hours', info.officeHours.trim() || null);
+  if (info.links !== undefined) set('links', JSON.stringify(info.links.filter((l) => l.url.trim())));
+  if (info.termId !== undefined) set('term_id', info.termId);
+  if (sets.length === 0) return;
+  await db.runAsync(`UPDATE groups SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`, ...values, new Date().toISOString(), id);
 }
 
 /** Moves everything (items and keywords) from one group into another, then removes the first. */

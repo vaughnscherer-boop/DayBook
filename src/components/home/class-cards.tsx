@@ -27,9 +27,11 @@ type Props = {
 };
 
 /** Home's "Classes" section: one card per class or group, with its next date and what's coming. */
-export function ClassCards({ groups, classIds, activeIds, upcoming, onChanged }: Props) {
+export function ClassCards({ groups: allGroups, classIds, activeIds, upcoming, onChanged }: Props) {
   const db = useSQLiteContext();
   const theme = useTheme();
+  // Courses from an ended term are archived: out of the way, but still reachable from Settings → Terms.
+  const groups = allGroups.filter((g) => !g.archived);
   const classes = groups.filter((g) => classIds.has(g.id));
   const notClasses = groups.filter((g) => !classIds.has(g.id));
   const [showDateOnly, setShowDateOnly] = useState(false);
@@ -69,7 +71,7 @@ export function ClassCards({ groups, classIds, activeIds, upcoming, onChanged }:
           <PressableScale
             key={group.id}
             scaleTo={0.98}
-            onPress={() => router.navigate({ pathname: '/calendar', params: { date: next?.startDay ?? today } })}
+            onPress={() => router.push({ pathname: '/group/[id]', params: { id: group.id } })}
             style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
             <View style={styles.cardTop}>
               <View style={[styles.dateChip, { backgroundColor: theme.background }]}>
@@ -79,7 +81,8 @@ export function ClassCards({ groups, classIds, activeIds, upcoming, onChanged }:
               <MenuButton
                 accessibilityLabel={`Options for ${group.name}`}
                 items={[
-                  { label: 'Edit', icon: 'edit', onPress: () => router.push({ pathname: '/group/[id]', params: { id: group.id } }) },
+                  { label: 'Open calendar', icon: 'event', onPress: () => router.navigate({ pathname: '/calendar', params: { date: next?.startDay ?? today } }) },
+                  { label: 'Edit', icon: 'edit', onPress: () => router.push({ pathname: '/group/[id]', params: { id: group.id, edit: '1' } }) },
                   { label: 'Delete', icon: 'trash', destructive: true, onPress: () => remove(group) },
                 ]}>
                 <View style={[styles.more, { backgroundColor: theme.background }]}>
