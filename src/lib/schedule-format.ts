@@ -146,3 +146,8 @@ export const IMPORT_TYPES: Record<string, 'document' | 'image'> = {
   'image/webp': 'image',
 };
 export const MAX_IMPORT_BYTES = 15 * 1024 * 1024;
+
+/** Text copied from a page (a Moodle course page, say): sent as-is in `data`, not base64. */
+export const TEXT_IMPORT = 'text/plain';
+export const MAX_IMPORT_TEXT = 200_000;
+export const isImportType = (mediaType: string) => mediaType === TEXT_IMPORT || !!IMPORT_TYPES[mediaType];

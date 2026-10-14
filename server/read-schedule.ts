@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-import { IMPORT_TYPES, SCHEDULE_SCHEMA, type ScheduleImport } from '../src/lib/schedule-format.ts';
+import { IMPORT_TYPES, SCHEDULE_SCHEMA, TEXT_IMPORT, type ScheduleImport } from '../src/lib/schedule-format.ts';
 
 // Server-only (runs in `server/index.ts` under Node, never in the app), so the API key and the SDK
 // stay out of the app bundle. Imports use relative `.ts` paths because Node runs this file directly.
@@ -36,6 +36,12 @@ Dated items
 - details: everything the document says about that particular item, as 1–3 short plain sentences a student can act on: what to do (exercises, pages, length), what it covers (chapters, topics), format and duration, how much of the grade it's worth, and how or where to submit. Pull in descriptions from anywhere in the document (an assignments section, a grading table, exam descriptions) onto the matching dated item. Use null when the document says nothing beyond the title; never invent or generalize.
 - Titles: short and specific, as a student would write them in a planner: "Quiz 1 (Ch. 1–2)", "Ex. 16–20 & story, Ch. 1", "Read Ch. 1 (pp. 1–11)", "Problem Set 2", "Test 2". Don't repeat the course code in titles.
 
+Pasted web pages
+- The input may be text copied from a school site page (Moodle, Canvas, Blackboard, Brightspace...): a course page, a Timeline or "Upcoming events" list, or an assignment page. It is messy: menus, repeated headings, "Opened:" / "Due:" lines, section names like "Week 3". Use only the real course content.
+- Items due or closing on a date are assignments, quizzes or exams as the wording says; "Opens" / "Opened" dates alone are not items. Ignore navigation, forums with no deadline, and links.
+- A date given as "Tuesday, 14 October, 11:59 PM" is that day at that time (a due time, not a class). Set at_class false and give the time. No classes or weekly meetings unless the page lists them: meetings can be [].
+- If the page names no course, use the page title or the heading as the course name.
+
 Grading
 - grading: the course's grade breakdown, one entry per weighted category, exactly as the document gives it ("Exams 40%", "Homework 25%", "Final 20%", "Participation 15%"). weight is the percent as a number. Merge a category listed in pieces (Midterm 1, Midterm 2) only if the document itself groups them; otherwise keep its lines. drop_lowest is how many of the lowest scores are dropped ("lowest quiz dropped" = 1), else null. [] if the document gives no weights; never invent them.
 
@@ -58,11 +64,13 @@ export async function readSchedule(input: {
   /** Gives up (with a friendly error) when this fires. */
   signal?: AbortSignal;
 }): Promise<{ schedule: ScheduleImport; costUsd: number }> {
+  const isText = input.mediaType === TEXT_IMPORT;
   const kind = IMPORT_TYPES[input.mediaType];
-  if (!kind) throw new ScheduleReadError('That file type isn’t supported — use a PDF, PNG, JPEG, GIF or WebP.');
+  if (!kind && !isText) throw new ScheduleReadError('That file type isn’t supported — use a PDF, PNG, JPEG, GIF or WebP.');
 
-  const file: Anthropic.Beta.BetaContentBlockParam =
-    kind === 'document'
+  const file: Anthropic.Beta.BetaContentBlockParam = isText
+    ? { type: 'text', text: `Text copied from a web page:\n\n${input.data}` }
+    : kind === 'document'
       ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: input.data } }
       : {
           type: 'image',

@@ -2,7 +2,7 @@ import { randomUUID } from 'expo-crypto';
 import { router, Stack } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { CalendarChips } from '@/components/calendar-chips';
 import { ImportCourseCard } from '@/components/import-course-card';
@@ -19,8 +19,8 @@ import { todayKey } from '@/lib/dates';
 import { readScheduleOnServer } from '@/lib/import-api';
 import { buildImportPlan, countPlan, defaultChoice, type CourseChoice } from '@/lib/import-schedule';
 import { rescheduleAll } from '@/lib/notifications';
-import { pickScheduleFile } from '@/lib/pick-schedule';
-import type { ScheduleImport } from '@/lib/schedule-format';
+import { pickScheduleFile, type PickedFile } from '@/lib/pick-schedule';
+import { MAX_IMPORT_TEXT, TEXT_IMPORT, type ScheduleImport } from '@/lib/schedule-format';
 
 type Step =
   | { kind: 'start'; error?: string }
@@ -42,6 +42,7 @@ export default function ImportScreen() {
   const [calendarId, setCalendarId] = useState<string | null>(null);
   const [imports, setImports] = useState<ImportRecord[]>([]);
   const [saving, setSaving] = useState(false);
+  const [pasted, setPasted] = useState('');
 
   useEffect(() => {
     listCalendars(db).then(setCalendars);
@@ -57,14 +58,27 @@ export default function ImportScreen() {
       setStep({ kind: 'start', error: picked.message });
       return;
     }
-    setStep({ kind: 'reading', fileName: picked.file.fileName });
+    await read(picked.file);
+  };
+
+  const readPasted = () => {
+    const text = pasted.trim();
+    if (text.length > MAX_IMPORT_TEXT) {
+      setStep({ kind: 'start', error: 'That’s too much text — paste just the part with the dates.' });
+      return;
+    }
+    return read({ fileName: 'Pasted page', mediaType: TEXT_IMPORT, data: text });
+  };
+
+  const read = async (file: PickedFile) => {
+    setStep({ kind: 'reading', fileName: file.fileName });
     const settings = await getSettings(db);
     let deviceId = settings.deviceId;
     if (!deviceId) {
       deviceId = randomUUID();
       await setSetting(db, 'deviceId', deviceId);
     }
-    const result = await readScheduleOnServer(picked.file, deviceId);
+    const result = await readScheduleOnServer(file, deviceId);
     if (!result.ok) {
       setStep({ kind: 'start', error: result.error });
       return;
@@ -72,7 +86,7 @@ export default function ImportScreen() {
     setChoices(result.schedule.courses.map((course) => defaultChoice(course)));
     // Classes go in a "School" calendar: an existing one, or a new one made on save.
     setCalendarId(school?.id ?? NEW_SCHOOL);
-    setStep({ kind: 'review', fileName: picked.file.fileName, schedule: result.schedule, costUsd: result.costUsd });
+    setStep({ kind: 'review', fileName: file.fileName, schedule: result.schedule, costUsd: result.costUsd });
   };
 
   const plan = useMemo(
@@ -148,6 +162,24 @@ export default function ImportScreen() {
             add before anything changes.
           </ThemedText>
           <Button title="Choose file…" onPress={pick} />
+          <View style={styles.block}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              OR PASTE A PAGE
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              On a Moodle, Canvas or other school page, select all, copy, and paste it here. Daybook finds the due dates
+              and exams.
+            </ThemedText>
+            <TextInput
+              value={pasted}
+              onChangeText={setPasted}
+              multiline
+              placeholder="Paste the page text…"
+              placeholderTextColor={theme.textSecondary}
+              style={[styles.paste, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+            />
+            <Button title="Read pasted text" onPress={readPasted} disabled={pasted.trim().length < 20} />
+          </View>
           {step.error && (
             <ThemedText type="small" style={{ color: theme.danger }}>
               {step.error}
@@ -256,6 +288,7 @@ const styles = StyleSheet.create({
   block: { gap: Spacing.two },
   importRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Spacing.two, padding: Spacing.two },
   flex: { flex: 1 },
+  paste: { minHeight: 120, maxHeight: 240, borderRadius: Spacing.two, padding: Spacing.two, fontSize: 15, textAlignVertical: 'top' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },
   centerText: { textAlign: 'center' },
   warnings: { borderRadius: Spacing.two, padding: Spacing.three, gap: Spacing.one, borderLeftWidth: 3 },

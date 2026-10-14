@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 import type { FeedResponse } from '../src/lib/feed-format.ts';
-import { IMPORT_TYPES, MAX_IMPORT_BYTES, type ImportResponse } from '../src/lib/schedule-format.ts';
+import { isImportType, MAX_IMPORT_BYTES, MAX_IMPORT_TEXT, TEXT_IMPORT, type ImportResponse } from '../src/lib/schedule-format.ts';
 import { readSchedule, ScheduleReadError } from './read-schedule.ts';
 import { FeedError, readFeed } from './school-feed.ts';
 import { summarizeTitles, SummarizeError } from './summarize-titles.ts';
@@ -66,7 +66,8 @@ async function handleImport(req: IncomingMessage, res: ServerResponse) {
   if (typeof data !== 'string' || typeof mediaType !== 'string' || typeof today !== 'string') {
     return fail(res, 400, 'Missing file.');
   }
-  if (!IMPORT_TYPES[mediaType]) return fail(res, 415, 'Use a PDF, PNG, JPEG, GIF or WebP file.');
+  if (!isImportType(mediaType)) return fail(res, 415, 'Use a PDF, PNG, JPEG, GIF or WebP file.');
+  if (mediaType === TEXT_IMPORT && data.length > MAX_IMPORT_TEXT) return fail(res, 413, 'That text is too long — paste just the part with the dates.');
 
   const device = String(req.headers['x-device-id'] ?? 'unknown');
   const day = new Date().toISOString().slice(0, 10);

@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { readSchedule, ScheduleReadError } from '../../../server/read-schedule.ts';
-import { IMPORT_TYPES, MAX_IMPORT_BYTES, type ImportResponse } from '../../../src/lib/schedule-format.ts';
+import { isImportType, MAX_IMPORT_BYTES, MAX_IMPORT_TEXT, TEXT_IMPORT, type ImportResponse } from '../../../src/lib/schedule-format.ts';
 
 /**
  * Hosted syllabus import (Supabase Edge Function), so imports work from the phone anywhere:
@@ -54,7 +54,8 @@ Deno.serve(async (req) => {
   if (typeof data !== 'string' || typeof mediaType !== 'string' || typeof today !== 'string') {
     return fail(400, 'Missing file.');
   }
-  if (!IMPORT_TYPES[mediaType]) return fail(415, 'Use a PDF, PNG, JPEG, GIF or WebP file.');
+  if (!isImportType(mediaType)) return fail(415, 'Use a PDF, PNG, JPEG, GIF or WebP file.');
+  if (mediaType === TEXT_IMPORT && data.length > MAX_IMPORT_TEXT) return fail(413, 'That text is too long — paste just the part with the dates.');
   if ((data.length * 3) / 4 > MAX_IMPORT_BYTES) return fail(413, 'That file is over 15 MB.');
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
