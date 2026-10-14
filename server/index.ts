@@ -1,7 +1,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
+import { MAX_BREAKDOWN_TEXT, type BreakdownResponse } from '../src/lib/breakdown-format.ts';
 import type { FeedResponse } from '../src/lib/feed-format.ts';
 import { isImportType, MAX_IMPORT_BYTES, MAX_IMPORT_TEXT, TEXT_IMPORT, type ImportResponse } from '../src/lib/schedule-format.ts';
+import { BreakdownError, breakDown } from './break-down.ts';
 import { readSchedule, ScheduleReadError } from './read-schedule.ts';
 import { FeedError, readFeed } from './school-feed.ts';
 import { summarizeTitles, SummarizeError } from './summarize-titles.ts';
@@ -23,7 +25,7 @@ const usage = new Map<string, { day: string; count: number }>();
 function send(
   res: ServerResponse,
   status: number,
-  body: ImportResponse | FeedResponse | { ok: true } | { ok: true; titles: string[] }
+  body: ImportResponse | FeedResponse | BreakdownResponse | { ok: true } | { ok: true; titles: string[] }
 ) {
   res.writeHead(status, {
     'content-type': 'application/json',
@@ -113,6 +115,32 @@ async function handleSummarize(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+/** POST /api/break-down { title, details, notes, due, today } -> { ok, steps }: the local twin of the break-down function. */
+async function handleBreakDown(req: IncomingMessage, res: ServerResponse) {
+  if (!process.env.ANTHROPIC_API_KEY) return fail(res, 500, 'No ANTHROPIC_API_KEY in .env.local.');
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse((await readBody(req)) ?? '');
+  } catch {
+    return fail(res, 400, 'Bad request.');
+  }
+  const text = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim().slice(0, MAX_BREAKDOWN_TEXT) : null);
+  const { due, today } = body;
+  const title = text(body.title);
+  if (!title || typeof due !== 'string' || typeof today !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(due) || !/^\d{4}-\d{2}-\d{2}$/.test(today)) {
+    return fail(res, 400, 'Send a title, a due date and today’s date.');
+  }
+  if (due < today) return fail(res, 400, 'That was due already.');
+  try {
+    const steps = await breakDown({ title, details: text(body.details), notes: text(body.notes), due, today }, AbortSignal.timeout(40_000));
+    send(res, 200, { ok: true, steps });
+  } catch (error) {
+    if (error instanceof BreakdownError) return fail(res, 502, error.message);
+    console.error('[break-down] failed', error);
+    fail(res, 500, 'Something went wrong.');
+  }
+}
+
 /**
  * POST /api/feed { url } -> FeedResponse: the local twin of the school-feed function. FEED_ALLOW_LOCAL=1
  * also lets it read http:// and localhost links, for trying feeds out on your own computer.
@@ -147,6 +175,10 @@ const server = createServer((req, res) => {
   }
   if (req.method === 'POST' && path === '/api/summarize') {
     handleSummarize(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
+    return;
+  }
+  if (req.method === 'POST' && path === '/api/break-down') {
+    handleBreakDown(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
     return;
   }
   if (req.method === 'POST' && path === '/api/feed') {

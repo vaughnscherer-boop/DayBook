@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { CourseInfoCard } from '@/components/course/course-info-card';
 import { GradeCard } from '@/components/course/grade-card';
 import { CourseUpcoming } from '@/components/course/course-upcoming';
+import { StudyPlanner } from '@/components/course/study-planner';
 import { GroupList } from '@/components/group-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -24,6 +25,7 @@ import { termRange } from '@/lib/terms';
 /** How far ahead a course's page looks. */
 const LOOKAHEAD_DAYS = 120;
 const SHOWN = 8;
+const STUDY_LOOKAHEAD_DAYS = 28;
 
 /** One class: where and when it meets, its links, what's coming up, and (⋯ → Edit) its name, color and shades. */
 export default function CourseScreen() {
@@ -62,6 +64,17 @@ export default function CourseScreen() {
       (a, b) => a.startDay.localeCompare(b.startDay) || (a.time ?? '').localeCompare(b.time ?? '')
     );
   }, [group, itemsBetween, today]);
+
+  // Exams in the next few weeks get a study planner; later ones can wait.
+  const exams = useMemo(
+    () =>
+      group
+        ? itemsBetween(today, shiftKey(today, STUDY_LOOKAHEAD_DAYS)).filter(
+            (item) => item.groupId === group.id && item.itemType === 'exam' && !item.repeating && !item.done
+          )
+        : [],
+    [group, itemsBetween, today]
+  );
 
   const toggle = async (item: CalendarItem) => {
     if (item.repeating) await setOccurrenceDone(db, item.id, item.occurrenceDate, !item.done);
@@ -103,6 +116,20 @@ export default function CourseScreen() {
             <Section title="Coming up">
               <CourseUpcoming items={upcoming} onToggle={toggle} />
             </Section>
+
+            {exams.length > 0 && (
+              <Section title="Study">
+                {exams.map((exam) => (
+                  <StudyPlanner
+                    key={exam.key}
+                    exam={exam}
+                    calendarId={group.calendar_id}
+                    items={itemsBetween(today, exam.startDay)}
+                    onChanged={changed}
+                  />
+                ))}
+              </Section>
+            )}
 
             <Section title="Edit class">
               <GroupList

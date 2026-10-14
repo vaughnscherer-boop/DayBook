@@ -1,4 +1,5 @@
 import { isMultiDay, itemsOnDay, type CalendarItem } from '@/lib/calendar-items';
+import { sessionsFor } from '@/lib/study-sessions';
 import { addDays, daysBetween, fromKey, toDateKey } from '@/lib/dates';
 
 /**
@@ -21,6 +22,8 @@ export type DayBrief = {
   stillOpen: CalendarItem[];
   /** Exams and homework in the next 7 days. */
   comingUp: CalendarItem[];
+  /** Study sessions already planned, by `comingUp` item key. */
+  planned: Record<string, number>;
 };
 
 const DAY_START = '08:00';
@@ -47,7 +50,7 @@ function weekdayName(day: string, today: string): string {
 }
 
 /** Free stretches between `timed` events inside the waking day (from `now` onward when it's today). */
-function freeGaps(timed: CalendarItem[], from: string): FreeGap[] {
+export function freeGaps(timed: CalendarItem[], from: string, minGap = MIN_GAP_MINUTES): FreeGap[] {
   const gaps: FreeGap[] = [];
   let cursor = minutes(from > DAY_START ? from : DAY_START);
   const end = minutes(DAY_END);
@@ -56,10 +59,16 @@ function freeGaps(timed: CalendarItem[], from: string): FreeGap[] {
     .sort((a, b) => a[0] - b[0]);
   for (const [start, stop] of [...busy, [end, end]]) {
     const gapEnd = Math.min(start, end);
-    if (gapEnd - cursor >= MIN_GAP_MINUTES) gaps.push({ kind: 'free', start: clock(cursor), end: clock(gapEnd) });
+    if (gapEnd - cursor >= minGap) gaps.push({ kind: 'free', start: clock(cursor), end: clock(gapEnd) });
     cursor = Math.max(cursor, stop);
   }
   return gaps;
+}
+
+/** Free stretches of at least `minGap` minutes on `day` (after `from`, e.g. now, when given). */
+export function freeGapsOn(items: CalendarItem[], day: string, from = DAY_START, minGap = MIN_GAP_MINUTES): FreeGap[] {
+  const timed = itemsOnDay(items, day).filter((item) => item.kind === 'event' && !item.allDay && !isMultiDay(item));
+  return freeGaps(timed, from, minGap);
 }
 
 export function buildBrief(items: CalendarItem[], day: string, now = new Date()): DayBrief {
@@ -122,6 +131,9 @@ export function buildBrief(items: CalendarItem[], day: string, now = new Date())
     dueToday,
     stillOpen,
     comingUp,
+    planned: Object.fromEntries(
+      comingUp.filter((item) => item.itemType === 'exam').map((item) => [item.key, sessionsFor(items, item).length])
+    ),
   };
 }
 

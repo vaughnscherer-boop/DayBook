@@ -270,6 +270,7 @@ export default function TodayScreen() {
                   <ThemedText type="small" themeColor="textSecondary">
                     {item.itemType === 'exam' ? 'Test' : 'Due'} {formatDateKey(item.startDay)}
                     {item.time ? `, ${formatShortTime(item.time)}` : ''}
+                    {brief.planned[item.key] ? ` · ${brief.planned[item.key]} study session${brief.planned[item.key] === 1 ? '' : 's'} planned` : ''}
                   </ThemedText>
                 </View>
                 <ThemedText

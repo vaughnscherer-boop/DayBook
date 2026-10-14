@@ -7,6 +7,8 @@ import { CalendarChips } from '@/components/calendar-chips';
 import { useChoiceDialog } from '@/components/choice-dialog';
 import { ColorSwatches } from '@/components/color-swatches';
 import { DateTimeField } from '@/components/date-time-field';
+import { BreakDown } from '@/components/course/break-down';
+import { ExamStudy } from '@/components/course/exam-study';
 import { ScoreField } from '@/components/course/score-field';
 import { GroupChips } from '@/components/group-chips';
 import { RepeatPicker } from '@/components/repeat-picker';
@@ -247,6 +249,18 @@ export default function TaskScreen() {
             details={details}
             course={shownGroup?.name ?? null}
             color={color ?? groupColor ?? calendarColor}
+          />
+        )}
+
+        {!isNew && !repeat && <ExamStudy id={id} />}
+        {!isNew && !repeat && !done && (itemType ?? guessedType) === 'assignment' && (
+          <BreakDown
+            title={title}
+            details={details}
+            notes={notes.trim() || null}
+            due={toDateKey(day)}
+            calendarId={calendarId}
+            groupId={shownGroup?.id ?? null}
           />
         )}
 

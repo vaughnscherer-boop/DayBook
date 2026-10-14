@@ -7,6 +7,7 @@ import { CalendarChips } from '@/components/calendar-chips';
 import { useChoiceDialog } from '@/components/choice-dialog';
 import { ColorSwatches } from '@/components/color-swatches';
 import { DateTimeField } from '@/components/date-time-field';
+import { ExamStudy } from '@/components/course/exam-study';
 import { ScoreField } from '@/components/course/score-field';
 import { GroupChips } from '@/components/group-chips';
 import { RepeatPicker } from '@/components/repeat-picker';
@@ -251,6 +252,8 @@ export default function EventScreen() {
             color={color ?? groupColor ?? calendarColor}
           />
         )}
+
+        {!isNew && !repeat && <ExamStudy id={id} />}
 
         <ThemedView type="backgroundElement" style={styles.group}>
           <ThemedView type="backgroundElement" style={styles.row}>
