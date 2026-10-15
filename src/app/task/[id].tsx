@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
@@ -35,45 +35,53 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive, notify } from '@/lib/confirm';
 import { dateToTime, daysBetween, fromKey, shiftKey, toDateKey } from '@/lib/dates';
+import { draftGroup, readDraft } from '@/lib/entry-draft';
 import { detectItemType, isCourseGroup, typeColor, type ItemType } from '@/lib/item-type';
 import { rescheduleAll } from '@/lib/notifications';
 import { parseRule, type RepeatRule } from '@/lib/recurrence';
 
 /**
- * Create (`/task/new`) or edit (`/task/<id>?date=<occurrence>`) a task. A repeating task is ticked
+ * Create (`/task/new`, or `/task/new?draft=1` filled in from quick add's typed text) or edit (`/task/<id>?date=<occurrence>`) a task. A repeating task is ticked
  * off per date, and saving asks whether to change only this date or all of them.
  */
 export default function TaskScreen() {
   const db = useSQLiteContext();
   const theme = useTheme();
-  const { id, date } = useLocalSearchParams<{ id: string; date?: string }>();
+  const params = useLocalSearchParams<{ id: string; date?: string; draft?: string }>();
+  const { id, date } = params;
   const isNew = id === 'new';
   const [choiceDialog, ask] = useChoiceDialog();
+  // What quick add read from the typed text, shown here to check over before it's added.
+  const [draft] = useState(() => (isNew && params.draft ? readDraft() : null));
+  const parsed = draft?.parsed;
 
-  const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState('');
-  const [day, setDay] = useState(() => (date ? fromKey(date) : new Date()));
-  const [hasTime, setHasTime] = useState(false);
+  const [title, setTitle] = useState(parsed?.title ?? '');
+  const [notes, setNotes] = useState(draft?.notes ?? '');
+  const [day, setDay] = useState(() =>
+    parsed ? fromKey(parsed.starts_at.slice(0, 10)) : date ? fromKey(date) : new Date()
+  );
+  const [hasTime, setHasTime] = useState(parsed ? !parsed.allDay : false);
   const [time, setTime] = useState(() => {
+    if (parsed && !parsed.allDay) return fromKey(parsed.starts_at);
     const next = new Date();
     next.setHours(9, 0, 0, 0);
     return next;
   });
   const [done, setDone] = useState(false);
   const [calendars, setCalendars] = useState<Calendar[]>([]);
-  const [calendarId, setCalendarId] = useState<string | null>(null);
+  const [calendarId, setCalendarId] = useState<string | null>(draft?.calendarId ?? null);
   const [color, setColor] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   // The group the automatic rules gave this task, and whether you picked one by hand this time.
   const [autoGroupId, setAutoGroupId] = useState<string | null>(null);
-  const [groupChoice, setGroupChoice] = useState<GroupChoice>('auto');
+  const [groupChoice, setGroupChoice] = useState<GroupChoice>(() => (draft && draftGroup(draft)) ?? 'auto');
   const [groupTouched, setGroupTouched] = useState(false);
   // Class, exam, assignment...; null = guessed from the title.
   const [itemType, setItemType] = useState<ItemType | null>(null);
   // What an imported syllabus says about it (read-only).
   const [details, setDetails] = useState<string | null>(null);
-  const [repeat, setRepeat] = useState<RepeatRule | null>(null);
-  const [repeatUntil, setRepeatUntil] = useState<string | null>(null);
+  const [repeat, setRepeat] = useState<RepeatRule | null>(parsed?.repeat ?? null);
+  const [repeatUntil, setRepeatUntil] = useState<string | null>(parsed?.repeatUntil ?? null);
   // For repeating tasks: when the series starts, and which date is being edited.
   const [series, setSeries] = useState<{ start: string; occurrence: string } | null>(null);
 
@@ -131,6 +139,8 @@ export default function TaskScreen() {
       }
       rescheduleAll(db);
       closeModal();
+      // Typed in quick add: show where it landed.
+      if (draft) router.navigate({ pathname: '/calendar', params: { date: input.date } });
     };
 
     if (isNew) {
@@ -241,7 +251,7 @@ export default function TaskScreen() {
             onChangeText={setTitle}
             placeholder="Task"
             placeholderTextColor={theme.textSecondary}
-            autoFocus={isNew}
+            autoFocus={isNew && !draft}
             style={[styles.input, styles.titleInput, { color: theme.text }, done && styles.done]}
           />
         </ThemedView>

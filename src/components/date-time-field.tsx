@@ -5,6 +5,8 @@ export type DateTimeFieldProps = {
   value: Date;
   onChange: (date: Date) => void;
   mode: 'date' | 'time' | 'datetime';
+  /** Small note after the pickers, e.g. how long an event is (shown on the computer). */
+  hint?: string | null;
 };
 
 const COMPONENTS = {

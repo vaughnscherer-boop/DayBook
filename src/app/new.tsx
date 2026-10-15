@@ -11,10 +11,12 @@ import { Spacing } from '@/constants/theme';
 import { getSettings, setSetting } from '@/db/settings';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { useTheme } from '@/hooks/use-theme';
-import { createFromParsed } from '@/lib/create-entry';
-import { rescheduleAll } from '@/lib/notifications';
+import { setDraft } from '@/lib/entry-draft';
 
-/** Quick add, opened from the bottom bar's +: type it in plain words, or pick a fuller form. */
+/**
+ * Quick add, opened from the bottom bar's +: type it in plain words and check it over in the full
+ * form before it's added, or start from a blank form.
+ */
 export default function NewScreen() {
   const db = useSQLiteContext();
   const theme = useTheme();
@@ -33,12 +35,14 @@ export default function NewScreen() {
   }, []);
   const chosen = calendars.find((c) => c.id === calendarId)?.id ?? calendars.find((c) => c.is_default)?.id ?? null;
 
-  const add = async ({ kind, parsed, calendarId: target, notes }: NewEntry) => {
-    await createFromParsed(db, kind, parsed, target, notes);
-    rescheduleAll(db);
-    // Show where it landed (straight there when this sheet was opened by its link).
+  const replaceWith = (href: Parameters<typeof router.push>[0]) => {
     if (router.canGoBack()) router.back();
-    router.navigate({ pathname: '/calendar', params: { date: parsed.starts_at.slice(0, 10) } });
+    router.push(href);
+  };
+  // Open what was understood in the event or task form, filled in, to change anything before adding.
+  const review = ({ kind, parsed, calendarId: target, notes }: NewEntry) => {
+    setDraft({ parsed, calendarId: target, notes });
+    replaceWith({ pathname: kind === 'event' ? '/event/[id]' : '/task/[id]', params: { id: 'new', draft: '1' } });
   };
 
   const row = (icon: IconName, label: string, onPress: () => void) => (
@@ -50,10 +54,6 @@ export default function NewScreen() {
       <Icon name="forward" size={13} weight="semibold" color={theme.textSecondary} />
     </Pressable>
   );
-  const replaceWith = (href: Parameters<typeof router.push>[0]) => {
-    if (router.canGoBack()) router.back();
-    router.push(href);
-  };
 
   return (
     <ThemedView style={styles.container}>
@@ -67,7 +67,7 @@ export default function NewScreen() {
             setCalendarId(id);
             setSetting(db, 'lastCalendarId', id);
           }}
-          onAdd={add}
+          onAdd={review}
           inputRef={inputRef}
         />
         <View>

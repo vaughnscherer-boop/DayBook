@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
@@ -23,7 +23,8 @@ import { addEventException, createEvent, deleteEvent, deleteEvents, getEvent, sa
 import { learnFromPlacement, listGroups, type Group, type GroupChoice } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive, notify } from '@/lib/confirm';
-import { daysBetween, fromKey, shiftKey, toDateKey, toDateTimeKey } from '@/lib/dates';
+import { daysBetween, formatDuration, fromKey, shiftKey, toDateKey, toDateTimeKey } from '@/lib/dates';
+import { draftGroup, readDraft } from '@/lib/entry-draft';
 import { detectItemType, isCourseGroup, typeColor, type ItemType } from '@/lib/item-type';
 import { rescheduleAll } from '@/lib/notifications';
 import { parseRule, type RepeatRule } from '@/lib/recurrence';
@@ -38,35 +39,41 @@ function defaultStart(start?: string) {
 }
 
 /**
- * Create (`/event/new`) or edit (`/event/<id>?date=<occurrence>`) an event. For a repeating event
+ * Create (`/event/new`, or `/event/new?draft=1` filled in from quick add's typed text) or edit (`/event/<id>?date=<occurrence>`) an event. For a repeating event
  * the form shows the tapped occurrence, and saving asks whether to change only it or all of them.
  */
 export default function EventScreen() {
   const db = useSQLiteContext();
   const theme = useTheme();
-  const { id, start, date } = useLocalSearchParams<{ id: string; start?: string; date?: string }>();
+  const params = useLocalSearchParams<{ id: string; start?: string; date?: string; draft?: string }>();
+  const { id, start, date } = params;
   const isNew = id === 'new';
   const [choiceDialog, ask] = useChoiceDialog();
+  // What quick add read from the typed text, shown here to check over before it's added.
+  const [draft] = useState(() => (isNew && params.draft ? readDraft() : null));
+  const parsed = draft?.parsed;
 
-  const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState('');
-  const [allDay, setAllDay] = useState(false);
-  const [startsAt, setStartsAt] = useState(() => defaultStart(start));
-  const [endsAt, setEndsAt] = useState(() => new Date(defaultStart(start).getTime() + HOUR));
+  const [title, setTitle] = useState(parsed?.title ?? '');
+  const [notes, setNotes] = useState(draft?.notes ?? '');
+  const [allDay, setAllDay] = useState(parsed?.allDay ?? false);
+  const [startsAt, setStartsAt] = useState(() => (parsed ? fromKey(parsed.starts_at) : defaultStart(start)));
+  const [endsAt, setEndsAt] = useState(() =>
+    parsed ? fromKey(parsed.ends_at) : new Date(defaultStart(start).getTime() + HOUR)
+  );
   const [calendars, setCalendars] = useState<Calendar[]>([]);
-  const [calendarId, setCalendarId] = useState<string | null>(null);
+  const [calendarId, setCalendarId] = useState<string | null>(draft?.calendarId ?? null);
   const [color, setColor] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   // The group the automatic rules gave this event, and whether you picked one by hand this time.
   const [autoGroupId, setAutoGroupId] = useState<string | null>(null);
-  const [groupChoice, setGroupChoice] = useState<GroupChoice>('auto');
+  const [groupChoice, setGroupChoice] = useState<GroupChoice>(() => (draft && draftGroup(draft)) ?? 'auto');
   const [groupTouched, setGroupTouched] = useState(false);
   // Class, exam, assignment...; null = guessed from the title.
   const [itemType, setItemType] = useState<ItemType | null>(null);
   // What an imported syllabus says about it (read-only).
   const [details, setDetails] = useState<string | null>(null);
-  const [repeat, setRepeat] = useState<RepeatRule | null>(null);
-  const [repeatUntil, setRepeatUntil] = useState<string | null>(null);
+  const [repeat, setRepeat] = useState<RepeatRule | null>(parsed?.repeat ?? null);
+  const [repeatUntil, setRepeatUntil] = useState<string | null>(parsed?.repeatUntil ?? null);
   // For repeating events: when the series starts, and which occurrence is being edited.
   const [series, setSeries] = useState<{ start: string; occurrence: string } | null>(null);
 
@@ -136,6 +143,8 @@ export default function EventScreen() {
       }
       rescheduleAll(db);
       closeModal();
+      // Typed in quick add: show where it landed.
+      if (draft) router.navigate({ pathname: '/calendar', params: { date: input.starts_at.slice(0, 10) } });
     };
 
     if (isNew) {
@@ -272,7 +281,7 @@ export default function EventScreen() {
             onChangeText={setTitle}
             placeholder="Title"
             placeholderTextColor={theme.textSecondary}
-            autoFocus={isNew}
+            autoFocus={isNew && !draft}
             style={[styles.input, { color: theme.text }]}
           />
         </ThemedView>
@@ -303,6 +312,7 @@ export default function EventScreen() {
             value={endsAt}
             onChange={setEndsAt}
             mode={allDay ? 'date' : 'datetime'}
+            hint={allDay ? null : formatDuration(startsAt, endsAt)}
           />
         </ThemedView>
 

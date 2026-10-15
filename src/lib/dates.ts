@@ -111,3 +111,18 @@ export function daysBetween(from: string, to: string): number {
 export function shiftKey(key: string, days: number): string {
   return `${toDateKey(addDays(fromKey(key.slice(0, 10)), days))}${key.slice(10)}`;
 }
+
+/** How long from start to end, e.g. '30 min', '1 hr', '1 hr 15 min', '2 days'; null when not after. */
+export function formatDuration(start: Date, end: Date): string | null {
+  const minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  if (minutes <= 0) return null;
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  const parts = [
+    days ? `${days} ${days === 1 ? 'day' : 'days'}` : '',
+    hours ? `${hours} hr` : '',
+    mins ? `${mins} min` : '',
+  ];
+  return parts.filter(Boolean).join(' ');
+}
