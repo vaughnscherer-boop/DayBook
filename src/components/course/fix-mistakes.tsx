@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { ErrorText } from '@/components/ui/error-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import type { CalendarEvent } from '@/db/events';
 import { applyFixes, fixItemsOf } from '@/db/fixes';
 import type { Group } from '@/db/groups';
@@ -185,19 +186,15 @@ export function FixMistakes({ group, events, tasks, onChanged }: Props) {
           </View>
         </>
       )}
-      {error && (
-        <ThemedText type="small" style={{ color: theme.danger }}>
-          {error}
-        </ThemedText>
-      )}
+      {error && <ErrorText error={error} />}
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   flex: { flex: 1 },
-  input: { minHeight: 64, maxHeight: 160, borderRadius: Spacing.two, padding: Spacing.two, fontSize: 15, textAlignVertical: 'top' },
+  input: { minHeight: 64, maxHeight: 160, borderRadius: Radius.sm, padding: Spacing.two, fontSize: 15, textAlignVertical: 'top' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two, paddingVertical: Spacing.one },
   buttons: { flexDirection: 'row', gap: Spacing.two },
 });

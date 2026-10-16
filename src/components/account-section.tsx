@@ -24,9 +24,7 @@ export function AccountSection({ style }: { style?: StyleProp<ViewStyle> }) {
 
   return (
     <View style={style}>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        ACCOUNT
-      </ThemedText>
+      <ThemedText type="sectionLabel">Account</ThemedText>
       <Pressable onPress={() => router.push('/account')} style={styles.row} accessibilityRole="button">
         {status.state === 'signedOut' ? (
           <ThemedText type="small" style={{ color: theme.accent }}>

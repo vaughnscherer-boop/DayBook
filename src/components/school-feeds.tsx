@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { EventColors, Spacing } from '@/constants/theme';
+import { EventColors, Radius, Spacing } from '@/constants/theme';
 import { createCalendar, type Calendar } from '@/db/calendars';
 import { addFeed, listFeeds, removeFeed, type Feed } from '@/db/feeds';
 import { useTheme } from '@/hooks/use-theme';
@@ -184,7 +184,7 @@ function hostOf(link: string): string {
 
 const styles = StyleSheet.create({
   container: { gap: Spacing.two },
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   flex: { flex: 1 },
   input: { fontSize: 15, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: Spacing.one },

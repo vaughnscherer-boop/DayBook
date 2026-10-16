@@ -8,7 +8,8 @@ export type BreakdownRequest = {
   /** 'YYYY-MM-DD' on the student's device */
   today: string;
 };
-export type BreakdownStep = { title: string; date: string };
+/** `minutes`: how long the step should take; servers deployed before estimates leave it out. */
+export type BreakdownStep = { title: string; date: string; minutes?: number };
 export type BreakdownResponse = { ok: true; steps: BreakdownStep[] } | { ok: false; error: string };
 
 export const MAX_BREAKDOWN_TEXT = 4000;

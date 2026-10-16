@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
 import { onDataChanged } from '@/lib/data-events';
+import { handleReminderAction } from '@/lib/reminder-actions';
 import {
   configureNotifications,
   ensurePermission,
@@ -36,15 +37,17 @@ export function NotificationSync() {
     });
     const stopSync = onDataChanged(() => rescheduleAll(db));
 
+    // Done / Snooze / Tomorrow act on the task; a plain tap opens it.
+    const respond = async (response: Notifications.NotificationResponse) => {
+      if (!(await handleReminderAction(db, response))) openFromNotification(response.notification);
+    };
     // A tap that launched the app from closed, then any taps while it's running.
     const launchResponse = Notifications.getLastNotificationResponse();
     if (launchResponse) {
-      openFromNotification(launchResponse.notification);
+      respond(launchResponse);
       Notifications.clearLastNotificationResponse();
     }
-    const taps = Notifications.addNotificationResponseReceivedListener((response) =>
-      openFromNotification(response.notification)
-    );
+    const taps = Notifications.addNotificationResponseReceivedListener(respond);
 
     return () => {
       appState.remove();

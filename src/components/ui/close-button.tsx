@@ -1,11 +1,11 @@
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { Platform, StyleSheet, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Back if there's somewhere to go back to (not after a deep link or reload), otherwise Home. */
@@ -50,10 +50,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
-    paddingVertical: Spacing.one + 2,
-    paddingLeft: Spacing.two + 2,
-    paddingRight: Spacing.three - 2,
-    borderRadius: 10,
+    paddingVertical: Spacing.two,
+    paddingLeft: Spacing.twoHalf,
+    paddingRight: Spacing.twoHalf,
+    borderRadius: Radius.sm,
     borderWidth: 1,
   },
 });
+
+/**
+ * Close for a modal's header. On iOS it's a native toolbar button, so it sits in the system's own glass
+ * capsule instead of drawing a second pill inside it; elsewhere the outlined pill.
+ */
+export function CloseToolbar({ onPress = closeModal }: { onPress?: () => void }) {
+  if (Platform.OS === 'ios') {
+    return (
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button icon="xmark" accessibilityLabel="Close" onPress={onPress} />
+      </Stack.Toolbar>
+    );
+  }
+  return <Stack.Screen options={{ headerRight: () => <CloseButton onPress={onPress} /> }} />;
+}

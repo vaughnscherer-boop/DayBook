@@ -2,6 +2,7 @@ import type { CalendarEvent } from '@/db/events';
 import type { Group } from '@/db/groups';
 import { addDays, toDateKey } from '@/lib/dates';
 import { bestGroup, courseCode } from '@/lib/grouping';
+import { detectItemType } from '@/lib/item-type';
 import { occurrences, parseRule } from '@/lib/recurrence';
 
 /**
@@ -90,12 +91,22 @@ export function findClassPhrase(text: string): ClassPhrase | null {
 
 type Meeting = { startsAt: string; classInfo: ClassInfo };
 
-/** Every meeting of these classes from `fromDay` for the next few months, in time order. */
+const isExam = (event: CalendarEvent) =>
+  (event.item_type ?? detectItemType(event.title, 'event', event.repeat !== null, true)) === 'exam';
+
+/**
+ * Every meeting of these classes from `fromDay` for the next few months, in time order. Exams aren't
+ * meetings, and a meeting an exam takes the place of (same day, within the hour) is skipped, so "due
+ * next class" doesn't land on test day.
+ */
 function upcomingMeetings(classes: ClassInfo[], fromDay: string): Meeting[] {
   const toDay = toDateKey(addDays(new Date(`${fromDay}T00:00`), LOOKAHEAD_DAYS));
   const meetings: Meeting[] = [];
   for (const classInfo of classes) {
-    for (const event of classInfo.meetings) {
+    const exams = classInfo.meetings.filter(isExam).map((event) => new Date(event.starts_at).getTime());
+    const replaced = (startsAt: string) =>
+      exams.some((exam) => Math.abs(exam - new Date(startsAt).getTime()) <= 60 * 60 * 1000);
+    for (const event of classInfo.meetings.filter((e) => !isExam(e))) {
       const seriesStart = event.starts_at.slice(0, 10);
       const time = event.starts_at.slice(11, 16);
       const rule = parseRule(event.repeat);
@@ -104,7 +115,7 @@ function upcomingMeetings(classes: ClassInfo[], fromDay: string): Meeting[] {
         : seriesStart >= fromDay && seriesStart <= toDay
           ? [seriesStart]
           : [];
-      for (const day of days) meetings.push({ startsAt: `${day}T${time}`, classInfo });
+      for (const day of days) if (!replaced(`${day}T${time}`)) meetings.push({ startsAt: `${day}T${time}`, classInfo });
     }
   }
   return meetings.sort((a, b) => a.startsAt.localeCompare(b.startsAt));

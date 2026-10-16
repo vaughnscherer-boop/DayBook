@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -9,20 +9,30 @@ import { DayItemRow } from '@/components/day-item-row';
 import { ReminderLink } from '@/components/reminder-link';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { Chip } from '@/components/ui/chip';
 import { ThemedView } from '@/components/themed-view';
+import { WeekReview } from '@/components/week-review';
 import { TaskCheck } from '@/components/ui/task-check';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { deleteEvent } from '@/db/events';
 import { getSettings } from '@/db/settings';
+import { deleteTask } from '@/db/tasks';
 import { useShortTitles } from '@/hooks/use-short-titles';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { useTheme } from '@/hooks/use-theme';
-import { itemsOnDay } from '@/lib/calendar-items';
+import { itemsOnDay, type CalendarItem } from '@/lib/calendar-items';
 import { createFromParsed } from '@/lib/create-entry';
-import { formatDateKey, formatTime } from '@/lib/dates';
+import { notifyDataChanged } from '@/lib/data-events';
+import { formatDateKey, formatTime, fromKey, shiftKey, toDateKey } from '@/lib/dates';
 import { rescheduleAll } from '@/lib/notifications';
+import { showToast } from '@/lib/toast';
+import { toggleTask } from '@/lib/task-toggle';
 import { planLines, planningDay, type PlannedLine } from '@/lib/tomorrow-list';
 
 type Row = { id: number; text: string };
+
+/** Tappable examples of what the check-in understands. */
+const EXAMPLES = ['gym 7am', 'essay due thursday', 'quiz in 3 days', 'read ch 4 due next class', 'call mom'];
 
 /** "Tue, Oct 13 · 7:00–8:00 AM", "due Wed 8:00 AM (next LAT 111 class)", "Tue, Oct 13" … */
 function when(line: PlannedLine, day: string): string {
@@ -46,7 +56,7 @@ function when(line: PlannedLine, day: string): string {
 export default function TomorrowScreen() {
   const db = useSQLiteContext();
   const theme = useTheme();
-  const { itemsBetween, calendars, classes } = useCalendarData();
+  const { itemsBetween, calendars, classes, reload, tasks } = useCalendarData();
   const tabBarSpace = useTabBarSpace();
   // A tab stays mounted: recompute which day we're planning each time it's shown.
   const [day, setDay] = useState(() => planningDay());
@@ -54,8 +64,16 @@ export default function TomorrowScreen() {
   const [rows, setRows] = useState<Row[]>([{ id: 0, text: '' }]);
   const nextId = useRef(1);
   const inputs = useRef(new Map<number, TextInput>());
-  // Which bullet to focus once it has rendered (after Enter or Backspace).
-  const [focusId, setFocusId] = useState<number | null>(0);
+  // Which bullet to focus once it has rendered (after Enter or Backspace). The keyboard only comes up
+  // by itself when opened from the night reminder (/tomorrow?focus=1); otherwise it would cover the tab bar.
+  const { focus, review } = useLocalSearchParams<{ focus?: string; review?: string }>();
+  // Sunday nights (or from the week-review notification): look back at the week and ahead to the next.
+  const today = toDateKey(new Date());
+  const showReview = !!review || fromKey(today).getDay() === 0;
+  const [focusId, setFocusId] = useState<number | null>(null);
+  useEffect(() => {
+    if (focus) inputs.current.values().next().value?.focus();
+  }, [focus]);
   const [chosenClasses, setChosenClasses] = useState<Record<string, string>>({});
   const [defaultCalendarId, setDefaultCalendarId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -103,17 +121,32 @@ export default function TomorrowScreen() {
     setFocusId((rows[at - 1] ?? rows[at + 1]).id);
   };
 
+  const toggle = (item: CalendarItem) => toggleTask(db, item, reload);
+
+  // Tapping an example fills the empty bullet you're on, or starts a new one.
+  const addExample = (example: string) => {
+    const last = rows[rows.length - 1];
+    if (last.text.trim() === '') setRows(rows.map((row) => (row.id === last.id ? { ...row, text: example } : row)));
+    else setRows([...rows, newRow(example)]);
+  };
+
   const save = async () => {
     if (saving || lines.length === 0 || waiting > 0) return;
     setSaving(true);
     await settle();
+    const added: { kind: 'event' | 'task'; id: string }[] = [];
     for (const line of lines) {
       const title = short(line.parsed.title);
       // The wording as typed stays in the notes when the title was shortened.
       const notes = title === line.parsed.title ? undefined : line.text;
-      await createFromParsed(db, line.kind, { ...line.parsed, title }, line.calendar?.id ?? null, notes);
+      added.push({ kind: line.kind, id: await createFromParsed(db, line.kind, { ...line.parsed, title }, line.calendar?.id ?? null, notes) });
     }
     rescheduleAll(db);
+    showToast(`Added ${added.length} ${added.length === 1 ? 'thing' : 'things'}`, async () => {
+      for (const entry of added) await (entry.kind === 'event' ? deleteEvent(db, entry.id) : deleteTask(db, entry.id));
+      notifyDataChanged();
+      rescheduleAll(db);
+    });
     // The tab stays mounted, so clear the list for next time.
     setRows([{ id: nextId.current++, text: '' }]);
     setChosenClasses({});
@@ -133,14 +166,18 @@ export default function TomorrowScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.container}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive">
           <View>
-            <ThemedText type="subtitle" style={styles.heading}>
-              New Tasks Coming Up?
-            </ThemedText>
+            <ThemedText type="subtitle">New tasks coming up?</ThemedText>
             <ThemedText themeColor="textSecondary">Anything without a date goes on {formatDateKey(day)}</ThemedText>
           </View>
           <ReminderLink kind="night" />
+          {showReview && (
+            <WeekReview day={day} today={today} items={itemsBetween(shiftKey(today, -14), shiftKey(day, 7))} tasks={tasks} />
+          )}
 
           {already.length > 0 && (
             <View style={styles.block}>
@@ -158,7 +195,7 @@ export default function TomorrowScreen() {
                       params: { id: item.id, date: item.occurrenceDate },
                     })
                   }
-                  onToggle={() => {}}
+                  onToggle={() => toggle(item)}
                 />
               ))}
             </View>
@@ -193,10 +230,13 @@ export default function TomorrowScreen() {
             ))}
           </ThemedView>
           <ThemedText type="small" themeColor="textSecondary">
-            One thing per line. Add a day for anything later than tomorrow (“lab report due thursday”, “quiz in 3 days”).
-            Add a time to put it on the calendar (“gym 7am”); everything else becomes a task. “Due next class” and
-            “#work” work too.
+            One thing per line. Add a time to put it on the calendar; everything else becomes a task.
           </ThemedText>
+          <View style={styles.examples}>
+            {EXAMPLES.map((example) => (
+              <Chip key={example} label={example} role="button" selected={false} onPress={() => addExample(example)} />
+            ))}
+          </View>
 
           {lines.length > 0 && (
             <View style={styles.block}>
@@ -270,14 +310,14 @@ export default function TomorrowScreen() {
 }
 
 const styles = StyleSheet.create({
+  examples: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   container: { flex: 1 },
   content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
-  heading: { fontSize: 26, lineHeight: 32 },
   block: { gap: Spacing.two },
-  box: { borderRadius: Spacing.three, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, minHeight: 160 },
+  box: { borderRadius: Radius.md, borderCurve: 'continuous', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, minHeight: 160 },
   bulletRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   bullet: { fontSize: 20, lineHeight: 24 },
-  input: { flex: 1, fontSize: 17, paddingVertical: Spacing.one + 2 },
+  input: { flex: 1, fontSize: 17, paddingVertical: Spacing.two },
   previewRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
   check: { fontSize: 18, lineHeight: 22, width: 16 },
   bar: { width: 4, alignSelf: 'stretch', borderRadius: 2, marginHorizontal: 6 },
@@ -288,7 +328,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: Radius.full,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.half,
   },

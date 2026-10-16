@@ -26,8 +26,15 @@ export type DayBrief = {
   planned: Record<string, number>;
 };
 
-const DAY_START = '08:00';
-const DAY_END = '21:00';
+// Your waking day, from Settings (set with `setDayHours` whenever the calendar loads).
+let DAY_START = '08:00';
+let DAY_END = '21:00';
+
+/** Sets the hours free time is looked for in. An end at or before the start means midnight. */
+export function setDayHours(start: string, end: string) {
+  DAY_START = start;
+  DAY_END = end > start ? end : '23:59';
+}
 const MIN_GAP_MINUTES = 60;
 const LOOK_BACK_DAYS = 14;
 const LOOK_AHEAD_DAYS = 7;

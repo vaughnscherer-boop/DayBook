@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { TaskCheck } from '@/components/ui/task-check';
-import { Spacing } from '@/constants/theme';
+import { Radius, Shadow, Spacing } from '@/constants/theme';
 import type { Group } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
 import { tint, type CalendarItem } from '@/lib/calendar-items';
@@ -90,18 +90,19 @@ export function ItemCard({ item, subtitle, highlighted, notes, onOpen, onToggle 
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    borderRadius: 18,
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.three - 2,
-    gap: Spacing.two + 4,
-    boxShadow: '0 1px 2px rgba(22, 22, 22, 0.04)',
+    padding: Spacing.twoHalf,
+    gap: Spacing.twoHalf,
+    boxShadow: Shadow.card,
   },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two + 4 },
-  tile: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.twoHalf },
+  tile: { width: 40, height: 40, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
   text: { flex: 1, gap: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   liveDot: { width: 7, height: 7, borderRadius: 3.5 },
   title: { flex: 1, fontSize: 15 },
   done: { textDecorationLine: 'line-through' },
-  notes: { borderRadius: 12, padding: Spacing.two + 4 },
+  notes: { borderRadius: Radius.sm, padding: Spacing.twoHalf },
 });

@@ -5,13 +5,14 @@ import { AppState, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Spacing } from '@/constants/theme';
-import { clearPastDue, listPastDue, markMissed, type PastDueTask } from '@/db/past-due';
+import { Overlay, Radius, Spacing } from '@/constants/theme';
+import { clearPastDue, listPastDue, markMissed, reopenPastDue, type PastDueTask } from '@/db/past-due';
 import { getSettings } from '@/db/settings';
 import { useTheme } from '@/hooks/use-theme';
 import { notifyDataChanged } from '@/lib/data-events';
 import { formatDateKey, formatShortTime, todayKey } from '@/lib/dates';
 import { rescheduleAll } from '@/lib/notifications';
+import { showToast } from '@/lib/toast';
 
 /**
  * Tasks whose due time has passed, checked when the app opens or comes back to the foreground.
@@ -62,6 +63,13 @@ export function PastDuePrompt() {
     else await markMissed(db, done);
     setTasks((current) => current.filter((task) => !done.includes(task)));
     changed();
+    // The toast would sit behind the dialog while others are still being asked about.
+    if (tasks.some((task) => !done.includes(task))) return;
+    const what = done.length === 1 ? done[0].title : `${done.length} tasks`;
+    showToast(didIt ? `Done: ${what}` : `Moved to Overdue: ${what}`, async () => {
+      await reopenPastDue(db, done);
+      changed();
+    });
   };
 
   const when = (task: PastDueTask) => {
@@ -75,7 +83,7 @@ export function PastDuePrompt() {
         <ThemedView style={[styles.sheet, { borderColor: theme.backgroundSelected }]}>
           <ThemedText type="subtitle">Did you do {tasks.length === 1 ? 'this' : 'these'}?</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {tasks.length === 1 ? 'Its due time has passed.' : 'Their due times have passed.'} Done ones are cleared away;
+            {tasks.length === 1 ? 'Its due time has passed.' : 'Their due times have passed.'} Done ones are ticked off;
             the rest move to Overdue.
           </ThemedText>
           <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
@@ -124,20 +132,20 @@ export function PastDuePrompt() {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: Spacing.three },
+  backdrop: { flex: 1, backgroundColor: Overlay, alignItems: 'center', justifyContent: 'center', padding: Spacing.three },
   sheet: {
     width: '100%',
     maxWidth: 480,
     maxHeight: '85%',
-    borderRadius: Spacing.four,
+    borderRadius: Radius.lg, borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.four,
     gap: Spacing.three,
   },
   list: { flexGrow: 0 },
   listContent: { gap: Spacing.two },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Spacing.two, padding: Spacing.two + 2 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Radius.sm, padding: Spacing.twoHalf },
   flex: { flex: 1 },
-  choice: { paddingHorizontal: Spacing.two + 2, paddingVertical: Spacing.one + 2, borderRadius: 10 },
+  choice: { paddingHorizontal: Spacing.twoHalf, paddingVertical: Spacing.two, borderRadius: Radius.sm },
   footer: { flexDirection: 'row', justifyContent: 'space-between' },
 });

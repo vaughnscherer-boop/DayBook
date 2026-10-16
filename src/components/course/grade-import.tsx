@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { ErrorText } from '@/components/ui/error-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { itemTypeOf } from '@/db/calendars';
 import type { CalendarEvent } from '@/db/events';
 import { createCategory, setScore, type GradeCategory } from '@/db/grades';
@@ -269,22 +270,18 @@ export function GradeImport({ group, categories, events, tasks, percent, onChang
         </>
       )}
 
-      {error && (
-        <ThemedText type="small" style={{ color: theme.danger }}>
-          {error}
-        </ThemedText>
-      )}
+      {error && <ErrorText error={error} />}
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   head: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   flex: { flex: 1 },
   closed: { gap: Spacing.two },
   reading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.two },
-  paste: { minHeight: 100, maxHeight: 220, borderRadius: Spacing.two, padding: Spacing.two, fontSize: 15, textAlignVertical: 'top' },
+  paste: { minHeight: 100, maxHeight: 220, borderRadius: Radius.sm, padding: Spacing.two, fontSize: 15, textAlignVertical: 'top' },
   buttons: { flexDirection: 'row', gap: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.one },
 });

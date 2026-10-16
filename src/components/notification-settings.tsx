@@ -6,7 +6,7 @@ import { Alert, Linking, Pressable, StyleSheet, Switch, View } from 'react-nativ
 import { DateTimeField } from '@/components/date-time-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { DEFAULT_SETTINGS, getSettings, setSetting, type Settings } from '@/db/settings';
 import { useTheme } from '@/hooks/use-theme';
 import { dateToTime, timeToDate } from '@/lib/dates';
@@ -18,7 +18,7 @@ import {
   sendTestNotification,
 } from '@/lib/notifications';
 
-/** Morning summary and nightly check-in switches, times, and test buttons (side panel section). */
+/** Morning summary and nightly check-in switches, times, and test buttons (a Settings section). */
 export function NotificationSettings() {
   const db = useSQLiteContext();
   const theme = useTheme();
@@ -81,6 +81,23 @@ export function NotificationSettings() {
         onTest={phone ? () => test('morning') : undefined}
       />
 
+      <ThemedView type="backgroundElement" style={styles.group}>
+        <ThemedView type="backgroundElement" style={styles.row}>
+          <ThemedText type="label" style={styles.sectionTitle}>
+            Remind me about tests and homework
+          </ThemedText>
+          <Switch
+            value={settings.defaultReminders}
+            onValueChange={(on) => update('defaultReminders', on)}
+            accessibilityLabel="Remind me about tests and homework"
+          />
+        </ThemedView>
+        <ThemedText type="small" themeColor="textSecondary">
+          Tests: the evening before and an hour before. Homework: 3 hours before it’s due, or 8 PM if it has no time
+          and isn’t ticked off. Change any item’s reminders in its “Remind me” row.
+        </ThemedText>
+      </ThemedView>
+
       <Section
         title="Nightly check-in"
         description="Asks about new tasks coming up. Tap it, list what you found out about (for tomorrow or later), and Daybook puts it on your calendar."
@@ -108,7 +125,7 @@ function Section(props: {
   return (
     <ThemedView type="backgroundElement" style={styles.group}>
       <ThemedView type="backgroundElement" style={styles.row}>
-        <ThemedText type="smallBold" style={styles.sectionTitle}>
+        <ThemedText type="label" style={styles.sectionTitle}>
           {props.title}
         </ThemedText>
         <Switch value={props.enabled} onValueChange={props.onToggle} />
@@ -137,7 +154,7 @@ function Section(props: {
 
 const styles = StyleSheet.create({
   container: { gap: Spacing.three },
-  group: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  group: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { fontSize: 15 },
+  sectionTitle: { flex: 1 },
 });

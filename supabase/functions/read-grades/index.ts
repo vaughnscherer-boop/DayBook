@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
   const { data: auth } = await admin.auth.getUser(token);
-  if (!auth.user) return fail(401, 'Sign in to Daybook (side panel → Account) to import grades.');
+  if (!auth.user) return fail(401, 'Sign in first: this uses your Daybook account.');
 
   let body: Record<string, unknown>;
   try {

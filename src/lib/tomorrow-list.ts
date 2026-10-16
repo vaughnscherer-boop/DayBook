@@ -42,7 +42,7 @@ export function splitBullets(text: string): string[] {
  * Event or task: a time makes it an event ("gym 7am"), unless it's homework ("essay due 11:59pm",
  * "read ch 4 at 8"), which stays a task due then. No time = a task for that day.
  */
-function kindOf(line: string, parsed: ParsedEvent): EntryKind {
+export function kindOf(line: string, parsed: ParsedEvent): EntryKind {
   if (TASK_PREFIX.test(line)) return 'task';
   if (parsed.classRef && parsed.classRef.kind !== 'none') return 'task';
   if (parsed.allDay && !parsed.repeat) {

@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { DateTimeField } from '@/components/date-time-field';
 import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui/chip';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fromKey, toDateKey } from '@/lib/dates';
 import { describeRule, type RepeatRule } from '@/lib/recurrence';
@@ -73,7 +73,12 @@ export function RepeatPicker({ rule, until, startDay, onChange, onUntilChange }:
           </ThemedText>
         )}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      {/* Runs out to the card's edges, so chips scroll under them instead of being clipped at the padding. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipScroll}
+        contentContainerStyle={styles.chips}>
         {PRESETS.map(({ value, label }) => {
           const selected = value === preset;
           return (
@@ -124,12 +129,13 @@ export function RepeatPicker({ rule, until, startDay, onChange, onUntilChange }:
 const styles = StyleSheet.create({
   container: { gap: Spacing.two },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  chips: { gap: Spacing.two },
+  chipScroll: { marginHorizontal: -Spacing.three },
+  chips: { gap: Spacing.two, paddingHorizontal: Spacing.three },
   weekdays: { flexDirection: 'row', gap: Spacing.one },
   weekday: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: Radius.md, borderCurve: 'continuous',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

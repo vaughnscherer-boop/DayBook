@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
   const { data: auth } = await admin.auth.getUser(token);
   const user = auth.user;
-  if (!user) return fail(401, 'Sign in to Daybook (side panel → Account) to import a syllabus.');
+  if (!user) return fail(401, 'Sign in first: this uses your Daybook account.');
 
   let body: { fileName?: unknown; mediaType?: unknown; data?: unknown; today?: unknown; course?: unknown };
   try {

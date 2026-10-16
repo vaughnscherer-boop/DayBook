@@ -3,10 +3,11 @@ import { Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { CalendarChips } from '@/components/calendar-chips';
 import { DateTimeField } from '@/components/date-time-field';
+import { KindSwitch } from '@/components/kind-switch';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Icon } from '@/components/ui/icon';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import type { Calendar } from '@/db/calendars';
 import { useShortTitles } from '@/hooks/use-short-titles';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,9 +16,17 @@ import type { ClassInfo } from '@/lib/class-schedule';
 import { calendarFor } from '@/lib/create-entry';
 import { parseEvent, type ParsedEvent } from '@/lib/parse-event';
 import { describeRule } from '@/lib/recurrence';
+import { kindOf } from '@/lib/tomorrow-list';
 
 export type AddKind = 'event' | 'task';
-export type NewEntry = { kind: AddKind; parsed: ParsedEvent; calendarId: string | null; notes?: string };
+export type NewEntry = {
+  kind: AddKind;
+  parsed: ParsedEvent;
+  calendarId: string | null;
+  notes?: string;
+  /** The words as typed, to put back if you go back from the form. */
+  text: string;
+};
 
 type Props = {
   calendars: Calendar[];
@@ -29,6 +38,9 @@ type Props = {
   onCalendarChange: (calendarId: string) => void;
   onAdd: (entry: NewEntry) => void;
   inputRef?: Ref<TextInput>;
+  /** Text (and Event/Task choice) to start with: what you'd typed, when coming back from the form. */
+  initialText?: string;
+  initialKind?: AddKind;
 };
 
 /** The time picked by hand in the box, in place of the one read from the text. */
@@ -76,10 +88,21 @@ function describe(kind: AddKind, parsed: ParsedEvent) {
 }
 
 /** "What are you doing?" box: type "gym tomorrow 6pm #work" and it's read into an event or task. */
-export function AddBox({ calendars, referenceDay, calendarId, classes, onCalendarChange, onAdd, inputRef }: Props) {
+export function AddBox({
+  calendars,
+  referenceDay,
+  calendarId,
+  classes,
+  onCalendarChange,
+  onAdd,
+  inputRef,
+  initialText = '',
+  initialKind,
+}: Props) {
   const theme = useTheme();
-  const [text, setText] = useState('');
-  const [mode, setMode] = useState<AddKind>('event');
+  const [text, setText] = useState(initialText);
+  // Until Event or Task is tapped, it's guessed from the text like the night check-in does.
+  const [mode, setMode] = useState<AddKind | null>(initialKind ?? null);
   // The class picked from the "Which class?" chips, for "due next class" when the text doesn't say.
   const [chosenClassId, setChosenClassId] = useState<string | null>(null);
   // Tapping the preview opens pickers to change the time; typing again goes back to the text's time.
@@ -112,8 +135,9 @@ export function AddBox({ calendars, referenceDay, calendarId, classes, onCalenda
   };
   const { short, settle } = useShortTitles(parsed ? [parsed.title] : []);
   const classRef = parsed?.classRef ?? null;
-  // Something "due next class" is a task, whichever mode is on.
-  const kind: AddKind = TASK_PREFIX.test(text) || (classRef && classRef.kind !== 'none') ? 'task' : mode;
+  // Something "due next class" is a task, whichever mode is on; "essay due fri 11:59pm" is guessed as one.
+  const kind: AddKind =
+    TASK_PREFIX.test(text) || (classRef && classRef.kind !== 'none') ? 'task' : (mode ?? (parsed ? kindOf(text, parsed) : 'event'));
   const classColor =
     classRef?.kind === 'found' ? classes.find((c) => c.groupId === classRef.groupId)?.color : undefined;
   const canAdd = parsed !== null && classRef?.kind !== 'choose';
@@ -134,6 +158,7 @@ export function AddBox({ calendars, referenceDay, calendarId, classes, onCalenda
       calendarId: calendar?.id ?? null,
       // The wording as typed stays in the notes when the title was shortened.
       notes: title === parsed.title ? undefined : text.replace(TASK_PREFIX, '').trim(),
+      text,
     });
     setText('');
     setChosenClassId(null);
@@ -143,23 +168,7 @@ export function AddBox({ calendars, referenceDay, calendarId, classes, onCalenda
 
   return (
     <View style={styles.container}>
-      <ThemedView type="backgroundElement" style={styles.segmented}>
-        {(['event', 'task'] as const).map((value) => {
-          const selected = kind === value;
-          return (
-            <Pressable
-              key={value}
-              onPress={() => setMode(value)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              style={[styles.segment, selected && { backgroundColor: theme.background }]}>
-              <ThemedText type="small" themeColor={selected ? 'text' : 'textSecondary'}>
-                {value === 'event' ? 'Event' : 'Task'}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
-      </ThemedView>
+      <KindSwitch value={kind} onChange={setMode} />
 
       <ThemedView type="backgroundElement" style={styles.inputBox}>
         <TextInput
@@ -167,7 +176,7 @@ export function AddBox({ calendars, referenceDay, calendarId, classes, onCalenda
           value={text}
           onChangeText={changeText}
           onSubmitEditing={submit}
-          placeholder={kind === 'task' ? 'e.g. call bank friday' : 'What are you doing? e.g. gym tomorrow 6pm'}
+          placeholder={kind === 'task' ? 'e.g. essay due friday' : 'e.g. gym tomorrow 6pm'}
           placeholderTextColor={theme.textSecondary}
           returnKeyType="done"
           submitBehavior="blurAndSubmit"
@@ -265,24 +274,22 @@ export function AddBox({ calendars, referenceDay, calendarId, classes, onCalenda
 
 const styles = StyleSheet.create({
   container: { gap: Spacing.two },
-  segmented: { flexDirection: 'row', borderRadius: Spacing.two, padding: 2 },
-  segment: { flex: 1, alignItems: 'center', paddingVertical: Spacing.one, borderRadius: Spacing.two - 2 },
   inputBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.md, borderCurve: 'continuous',
     paddingLeft: Spacing.three,
     paddingRight: Spacing.two,
     paddingVertical: Spacing.one,
   },
   input: { flex: 1, fontSize: 16, paddingVertical: Spacing.two },
-  button: { borderRadius: 999, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one },
+  button: { borderRadius: Radius.full, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one },
   buttonText: { color: '#fff' },
   preview: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   previewText: { flex: 1 },
   changeTime: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  timeBox: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
+  timeBox: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.three },
   timeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   classChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
@@ -291,7 +298,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: Radius.full,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.half,
   },

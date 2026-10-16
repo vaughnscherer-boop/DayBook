@@ -7,7 +7,7 @@ import { GroupList } from '@/components/group-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Icon } from '@/components/ui/icon';
-import { EventColors, Spacing } from '@/constants/theme';
+import { EventColors, Radius, Spacing } from '@/constants/theme';
 import {
   createCalendar,
   deleteCalendar,
@@ -124,7 +124,7 @@ function CalendarRow({ calendar, editing, ...actions }: RowProps) {
       </Pressable>
 
       {editing && (
-        <ThemedView type="backgroundElement" style={styles.editor}>
+        <ThemedView style={styles.editor}>
           <TextInput
             value={name}
             onChangeText={setName}
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   },
   checkmark: { color: '#ffffff', fontSize: 13, lineHeight: 16, fontWeight: '700' },
   name: { flex: 1 },
-  editor: { borderRadius: Spacing.two, padding: Spacing.two, gap: Spacing.two, marginBottom: Spacing.one },
+  editor: { borderRadius: Radius.sm, padding: Spacing.two, gap: Spacing.two, marginBottom: Spacing.one },
   nameInput: {
     fontSize: 15,
     borderBottomWidth: StyleSheet.hairlineWidth,

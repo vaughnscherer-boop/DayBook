@@ -12,6 +12,7 @@ const SYSTEM = `You split a student's big assignment into small steps they can t
 - 3 to 6 steps, in the order a student would do them: understand the task, gather or read, draft, revise, submit. Fewer steps for a small task.
 - Titles are short imperative phrases of 2–7 words: "Outline the argument", "Draft sections 1–2", "Proofread and submit". Keep any numbers, chapter or page references from the assignment.
 - Dates are YYYY-MM-DD, spread sensibly from today to the due date, never after it and never before today. The last step is on the due date or the day before. If little time is left, use fewer steps, and put several on the same day if you must.
+- minutes: a realistic estimate of how long a typical student needs for the step, from 10 to 240.
 - Use only what the assignment says. Don't invent requirements, sources, page counts or tools.`;
 
 const SCHEMA = {
@@ -21,8 +22,8 @@ const SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        properties: { title: { type: 'string' }, date: { type: 'string' } },
-        required: ['title', 'date'],
+        properties: { title: { type: 'string' }, date: { type: 'string' }, minutes: { type: 'integer' } },
+        required: ['title', 'date', 'minutes'],
         additionalProperties: false,
       },
     },
@@ -80,6 +81,7 @@ export async function breakDown(input: BreakdownRequest, signal?: AbortSignal): 
     .map((step) => ({
       title: step.title.trim().slice(0, 120),
       date: step.date < input.today ? input.today : step.date > input.due ? input.due : step.date,
+      ...(Number.isFinite(step.minutes) && { minutes: Math.min(240, Math.max(10, Math.round(step.minutes!))) }),
     }))
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 8);

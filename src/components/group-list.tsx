@@ -6,7 +6,7 @@ import { ColorSwatches } from '@/components/color-swatches';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Icon } from '@/components/ui/icon';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { deleteGroup, mergeGroups, updateGroup, type Group } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/confirm';
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   smallDot: { width: 8, height: 8, borderRadius: 4 },
   name: { flex: 1 },
-  editor: { borderRadius: Spacing.two, padding: Spacing.two, gap: Spacing.two, marginBottom: Spacing.one },
+  editor: { borderRadius: Radius.sm, padding: Spacing.two, gap: Spacing.two, marginBottom: Spacing.one },
   nameInput: { fontSize: 15, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: Spacing.one },
   merge: { gap: Spacing.one },
   mergeChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: Radius.full,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.half,
   },

@@ -13,15 +13,16 @@ import { CourseStudy } from '@/components/course/course-study';
 import { GroupList } from '@/components/group-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { CloseButton, closeModal } from '@/components/ui/close-button';
+import { CloseToolbar, closeModal } from '@/components/ui/close-button';
+import { CourseAttendance } from '@/components/course/course-attendance';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Spacing } from '@/constants/theme';
 import { listTerms, type Term } from '@/db/terms';
-import { setOccurrenceDone, setTaskDone } from '@/db/tasks';
 import { gradeItems } from '@/db/grades';
+import { useAttendance } from '@/hooks/use-attendance';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import type { CalendarItem } from '@/lib/calendar-items';
-import { rescheduleAll } from '@/lib/notifications';
+import { toggleTask } from '@/lib/task-toggle';
 import { shiftKey, todayKey } from '@/lib/dates';
 import { termRange } from '@/lib/terms';
 
@@ -38,6 +39,7 @@ export default function CourseScreen() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const db = useSQLiteContext();
   const { groups, itemsBetween, categories, grades, events, tasks, reload } = useCalendarData();
+  const attendance = useAttendance();
   const group = groups.find((g) => g.id === id);
   const [terms, setTerms] = useState<Term[]>([]);
 
@@ -87,30 +89,38 @@ export default function CourseScreen() {
     [group, itemsBetween, today]
   );
 
-  const toggle = async (item: CalendarItem) => {
-    if (item.repeating) await setOccurrenceDone(db, item.id, item.occurrenceDate, !item.done);
-    else await setTaskDone(db, item.id, !item.done);
-    changed();
-    rescheduleAll(db);
-  };
+  const toggle = (item: CalendarItem) => toggleTask(db, item, changed);
 
   const term = terms.find((t) => t.id === group?.term_id);
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ title: group?.name ?? 'Class', headerRight: () => <CloseButton /> }} />
+      {/* The big name below is the title; the bar just holds Close. */}
+      <Stack.Screen options={{ title: '' }} />
+      <CloseToolbar />
       <ScrollView contentContainerStyle={styles.content}>
         {group ? (
           <>
-            {term && (
-              <View style={styles.term}>
+            {/* The class's own header: its name in its color, then who and where. */}
+            <View style={styles.header}>
+              <View style={styles.titleRow}>
                 <View style={[styles.dot, { backgroundColor: group.color }]} />
+                <ThemedText type="subtitle" style={styles.flex} numberOfLines={2}>
+                  {group.name}
+                </ThemedText>
+              </View>
+              {(group.instructor || group.location) && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {[group.instructor, group.location].filter(Boolean).join(' · ')}
+                </ThemedText>
+              )}
+              {term && (
                 <ThemedText type="small" themeColor="textSecondary">
                   {term.name} · {termRange(term)}
                   {group.archived ? ' · ended' : ''}
                 </ThemedText>
-              </View>
-            )}
+              )}
+            </View>
 
             <CourseInfoCard group={group} terms={terms} onChanged={changed} />
 
@@ -133,7 +143,11 @@ export default function CourseScreen() {
             </Section>
 
             <Section title="Coming up">
-              <CourseUpcoming items={upcoming} onToggle={toggle} />
+              <CourseUpcoming items={upcoming} onToggle={toggle} onChanged={changed} />
+            </Section>
+
+            <Section title="Attendance">
+              <CourseAttendance group={group} records={attendance} onChanged={changed} />
             </Section>
 
             {studyFor.length > 0 && (
@@ -175,9 +189,7 @@ export default function CourseScreen() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        {title.toUpperCase()}
-      </ThemedText>
+      <ThemedText type="heading">{title}</ThemedText>
       {children}
     </View>
   );
@@ -186,7 +198,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Spacing.three, gap: Spacing.four, paddingBottom: Spacing.six },
-  term: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  section: { gap: Spacing.two },
+  header: { gap: Spacing.one },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.twoHalf },
+  dot: { width: 12, height: 12, borderRadius: 6 },
+  flex: { flex: 1 },
+  section: { gap: Spacing.twoHalf },
 });

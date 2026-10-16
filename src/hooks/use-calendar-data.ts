@@ -6,10 +6,12 @@ import { listCalendars, type Calendar } from '@/db/calendars';
 import { listEvents, type CalendarEvent } from '@/db/events';
 import { gradeItems, listCategories, type GradeCategory } from '@/db/grades';
 import { autoGroup, listGroups, type Group } from '@/db/groups';
+import { getSettings } from '@/db/settings';
 import { listCompletions, listTasks, type Task, type TaskCompletion } from '@/db/tasks';
 import { buildItems, type CalendarItem } from '@/lib/calendar-items';
 import { buildClasses } from '@/lib/class-schedule';
 import { notifyLocalChange, onDataChanged } from '@/lib/data-events';
+import { setDayHours } from '@/lib/day-brief';
 import { courseGrade, type CourseGrade } from '@/lib/grades';
 
 /**
@@ -29,6 +31,9 @@ export function useCalendarData() {
 
   const reload = useCallback(async () => {
     await autoGroup(db);
+    // Free time and study sessions follow your day's hours from Settings.
+    const settings = await getSettings(db);
+    setDayHours(settings.dayStart, settings.dayEnd);
     const [nextEvents, nextTasks, nextCompletions, nextCalendars, nextGroups, nextCategories] = await Promise.all([
       listEvents(db),
       listTasks(db),

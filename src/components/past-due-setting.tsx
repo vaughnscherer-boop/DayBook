@@ -5,10 +5,10 @@ import { StyleSheet, Switch } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { DEFAULT_SETTINGS, getSettings, setSetting } from '@/db/settings';
 
-/** Settings switch: ask whether you did a task once it's past due, or clear past-due tasks automatically. */
+/** Settings switch: ask whether you did a task once it's past due, or tick past-due tasks off automatically. */
 export function PastDueSetting() {
   const db = useSQLiteContext();
   const [ask, setAsk] = useState(DEFAULT_SETTINGS.askAboutPastDue);
@@ -34,16 +34,15 @@ export function PastDueSetting() {
       </ThemedView>
       <ThemedText type="small" themeColor="textSecondary">
         {ask
-          ? 'When you open Daybook after a task’s due time, it asks whether you did it. Done tasks are cleared away; the rest move to Overdue.'
-          : 'Tasks are cleared away automatically once their due time passes, without asking.'}{' '}
-        Graded homework is ticked off instead of deleted, so it stays on the class’s grade.
+          ? 'When you open Daybook after a task’s due time, it asks whether you did it. Done tasks are ticked off; the rest move to Overdue.'
+          : 'Tasks are ticked off automatically once their due time passes, without asking.'}
       </ThemedText>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  group: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  group: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   flex: { flex: 1 },
 });

@@ -8,7 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { createTerm, deleteTerm, endTerm, listTerms, reopenTerm, termName, updateTerm, type Term } from '@/db/terms';
 import type { Group } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
@@ -202,7 +202,7 @@ function TermRow({
 
 const styles = StyleSheet.create({
   container: { gap: Spacing.two },
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   head: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   flex: { flex: 1 },
   editor: { gap: Spacing.two },

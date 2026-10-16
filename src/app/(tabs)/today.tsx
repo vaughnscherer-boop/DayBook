@@ -4,23 +4,29 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AttendanceCheck } from '@/components/attendance-check';
 import { useTabBarSpace } from '@/components/bottom-bar';
+import { ExamAlertCard } from '@/components/exam-alert-card';
+import { ItemRow, RowGroup } from '@/components/item-row';
+import { PlanGap } from '@/components/plan-gap';
 import { ReminderLink } from '@/components/reminder-link';
+import { SwipeTask } from '@/components/swipe-task';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { TaskCheck } from '@/components/ui/task-check';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { Spacing } from '@/constants/theme';
-import { moveTask, setOccurrenceDone, setTaskDone } from '@/db/tasks';
+import { Radius, Spacing } from '@/constants/theme';
+import { moveTask } from '@/db/tasks';
+import { useAttendance } from '@/hooks/use-attendance';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { useTheme } from '@/hooks/use-theme';
 import { textOn, type CalendarItem } from '@/lib/calendar-items';
 import { briefRange, buildBrief, untilText, type TimelineEntry } from '@/lib/day-brief';
-import { formatDateKey, formatShortTime, fromKey, toDateKey } from '@/lib/dates';
+import { daysBetween, formatDateKey, formatShortTime, fromKey, shiftKey, toDateKey, toDateTimeKey } from '@/lib/dates';
 import { rescheduleAll } from '@/lib/notifications';
+import { toggleTask } from '@/lib/task-toggle';
 
 const TYPE_LABEL: Partial<Record<CalendarItem['itemType'], string>> = { class: 'Class', exam: 'Test', reading: 'Reading' };
 
@@ -37,6 +43,9 @@ function duration(start: string, end: string) {
 }
 
 /** "Location: TOH 367" from an imported class's notes. */
+/** The narrow time column ('6:40PM', 'Now') stops growing here so it doesn't break mid-word. */
+const TIME_MAX_SCALE = 1.3;
+
 const locationOf = (item: CalendarItem) => item.notes?.match(/Location:\s*(.+)/)?.[1] ?? null;
 
 /**
@@ -46,7 +55,8 @@ const locationOf = (item: CalendarItem) => item.notes?.match(/Location:\s*(.+)/)
 export default function TodayScreen() {
   const db = useSQLiteContext();
   const theme = useTheme();
-  const { itemsBetween, reload } = useCalendarData();
+  const { itemsBetween, events, tasks, reload } = useCalendarData();
+  const attendance = useAttendance();
   const params = useLocalSearchParams<{ date?: string }>();
   const tabBarSpace = useTabBarSpace();
   // A tab stays mounted, so take a fresh "now" each time it's shown.
@@ -55,8 +65,13 @@ export default function TodayScreen() {
   const day = params.date ?? toDateKey(now);
 
   const [start, end] = briefRange(day);
-  const brief = useMemo(() => buildBrief(itemsBetween(start, end), day, now), [itemsBetween, start, end, day, now]);
+  const briefItems = useMemo(() => itemsBetween(start, end), [itemsBetween, start, end]);
+  const brief = useMemo(() => buildBrief(briefItems, day, now), [briefItems, day, now]);
   const isToday = day === toDateKey(now);
+  // The soonest test after today with no study time planned yet.
+  const unplannedExam = isToday
+    ? brief.comingUp.find((item) => item.itemType === 'exam' && !item.repeating && item.startDay > day && !brief.planned[item.key])
+    : undefined;
   const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
   const open = (item: CalendarItem) =>
@@ -68,23 +83,19 @@ export default function TodayScreen() {
     await reload();
     rescheduleAll(db);
   };
-  const toggle = async (item: CalendarItem) => {
-    // A repeating task is ticked off just for this date.
-    if (item.repeating) await setOccurrenceDone(db, item.id, item.occurrenceDate, !item.done);
-    else await setTaskDone(db, item.id, !item.done);
-    changed();
-  };
+  const toggle = (item: CalendarItem) => toggleTask(db, item, reload);
 
-  // Where the "Now" line goes: before the first thing that hasn't started yet.
+  // Where the "Now" line goes: before the first thing that hasn't started yet. A free stretch starts
+  // right at the current minute, so it counts as not started.
   const nowIndex = isToday
-    ? brief.timeline.findIndex((entry) => (entry.kind === 'free' ? entry.start : entry.item.startsAt!.slice(11, 16)) > nowTime)
+    ? brief.timeline.findIndex((entry) => (entry.kind === 'free' ? entry.start : entry.item.startsAt!.slice(11, 16)) >= nowTime)
     : -1;
 
   const timelineRow = (entry: TimelineEntry, i: number) => {
     if (entry.kind === 'free') {
-      return (
-        <View key={`free-${i}`} style={styles.row}>
-          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.time}>
+      const row = (
+        <View style={styles.row}>
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} maxFontSizeMultiplier={TIME_MAX_SCALE} style={styles.time}>
             {formatShortTime(entry.start)}
           </ThemedText>
           <View style={[styles.freeBar, { borderColor: theme.backgroundSelected }]} />
@@ -92,6 +103,13 @@ export default function TodayScreen() {
             Free until {formatShortTime(entry.end)} · {duration(entry.start, entry.end)}
           </ThemedText>
         </View>
+      );
+      // Today and later: offer to fill the stretch with work on what's due.
+      if (day < toDateKey(now)) return <View key={`free-${i}`}>{row}</View>;
+      return (
+        <PlanGap key={`free-${i}`} gap={entry} day={day} items={briefItems} tasks={tasks} onChanged={reload}>
+          {row}
+        </PlanGap>
       );
     }
     const { item } = entry;
@@ -125,49 +143,46 @@ export default function TodayScreen() {
     );
   };
 
+  const move = async (item: CalendarItem, date: string) => {
+    await moveTask(db, item.id, date);
+    changed();
+  };
+  const tomorrow = shiftKey(day, 1);
   const taskRow = (item: CalendarItem, actions?: 'stillOpen') => (
-    <Pressable key={item.key} onPress={() => open(item)} style={styles.row}>
-      <TaskCheck done={item.done} color={item.color} size={22} onToggle={() => toggle(item)} />
-      <View style={styles.flex}>
-        <ThemedText
-          type="smallBold"
-          numberOfLines={2}
-          themeColor={item.done ? 'textSecondary' : 'text'}
-          style={item.done && styles.done}>
-          {item.title}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {actions === 'stillOpen'
+    <SwipeTask
+      key={item.key}
+      item={item}
+      surface="backgroundElement"
+      onToggle={() => toggle(item)}
+      moves={[...(actions === 'stillOpen' ? [{ label: 'Today', date: day }] : []), { label: 'Tomorrow', date: tomorrow }]}
+      onMove={(date) => move(item, date)}>
+      <ItemRow
+        item={item}
+        subtitle={
+          actions === 'stillOpen'
             ? `from ${formatDateKey(item.startDay)}`
             : item.time
               ? `due ${formatShortTime(item.time)}`
-              : 'any time today'}
-        </ThemedText>
-        {item.details && !item.done && (
-          <ThemedText type="small" themeColor="textSecondary" numberOfLines={3} style={styles.details}>
-            {item.details}
-          </ThemedText>
-        )}
-      </View>
-      {actions === 'stillOpen' && (
-        <Pressable
-          onPress={async () => {
-            await moveTask(db, item.id, day);
-            changed();
-          }}
-          hitSlop={6}
-          style={[styles.smallButton, { borderColor: theme.backgroundSelected }]}>
-          <ThemedText type="small" style={{ color: theme.accent }}>
-            Move to today
-          </ThemedText>
-        </Pressable>
-      )}
-    </Pressable>
+              : isToday
+                ? 'any time today'
+                : 'any time'
+        }
+        details={item.details}
+        onOpen={() => open(item)}
+        onToggle={() => toggle(item)}
+        onChanged={reload}
+      />
+    </SwipeTask>
   );
 
-  const section = (title: string, children: ReactNode) => (
+  const section = (title: string, children: ReactNode, action?: ReactNode) => (
     <View style={styles.section}>
-      <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
+      <View style={styles.sectionHead}>
+        <ThemedText type="heading" style={styles.flex}>
+          {title}
+        </ThemedText>
+        {action}
+      </View>
       {children}
     </View>
   );
@@ -190,16 +205,15 @@ export default function TodayScreen() {
           <View style={styles.dateRow}>
             <View>
               <ThemedText type="display">{date.getDate()}</ThemedText>
-              <ThemedText style={styles.month}>
+              <ThemedText style={styles.month} themeColor="textSecondary" maxFontSizeMultiplier={1.3}>
                 {date.toLocaleDateString(undefined, { month: 'long' }).toUpperCase()}
               </ThemedText>
             </View>
             <View style={[styles.divider, { backgroundColor: theme.backgroundSelected }]} />
             <View style={styles.dateSide}>
-              <ThemedText style={styles.sideNumber}>
-                {isToday
-                  ? `${String(now.getHours()).padStart(2, '0')}.${String(now.getMinutes()).padStart(2, '0')}`
-                  : date.getFullYear()}
+              <ThemedText style={styles.sideNumber} maxFontSizeMultiplier={1.3}>
+                {/* "6:40PM", not "18.40", which reads like a date next to the day and month. */}
+                {isToday ? formatShortTime(nowTime) : date.getFullYear()}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 {isToday ? 'right now' : 'year'}
@@ -209,6 +223,18 @@ export default function TodayScreen() {
           <View style={[styles.rule, { backgroundColor: theme.backgroundSelected }]} />
           <ThemedText style={styles.summary}>{brief.summary}</ThemedText>
         </View>
+
+        {unplannedExam && (
+          <ExamAlertCard
+            exam={unplannedExam}
+            calendarId={
+              (unplannedExam.kind === 'event' ? events : tasks).find((row) => row.id === unplannedExam.id)?.calendar_id ?? null
+            }
+            items={itemsBetween(day, unplannedExam.startDay)}
+            today={day}
+            onChanged={changed}
+          />
+        )}
 
         {brief.allDay.length > 0 && (
           <View style={styles.chips}>
@@ -226,7 +252,7 @@ export default function TodayScreen() {
         )}
 
         {section(
-          'Your day',
+          isToday ? 'Your day' : 'Schedule',
           brief.timeline.length === 0 ? (
             <EmptyState icon="sun" text="No classes or events — the whole day is yours." />
           ) : (
@@ -234,7 +260,11 @@ export default function TodayScreen() {
               ...(i === nowIndex
                 ? [
                     <View key="now" style={styles.nowRow}>
-                      <ThemedText type="small" style={[styles.time, { color: theme.danger }]}>
+                      <ThemedText
+                        type="small"
+                        numberOfLines={1}
+                        maxFontSizeMultiplier={TIME_MAX_SCALE}
+                        style={[styles.time, { color: theme.danger }]}>
                         Now
                       </ThemedText>
                       <View style={[styles.nowLine, { backgroundColor: theme.danger }]} />
@@ -242,48 +272,83 @@ export default function TodayScreen() {
                   ]
                 : []),
               timelineRow(entry, i),
+              // A class that's over: did you go? (Counts toward the class's absences.)
+              ...(entry.kind === 'item' && entry.item.itemType === 'class' && entry.item.endsAt! <= toDateTimeKey(now)
+                ? [
+                    <AttendanceCheck
+                      key={`attend-${entry.item.key}`}
+                      item={entry.item}
+                      status={attendance.find((a) => a.id === `${entry.item.id}|${entry.item.occurrenceDate}`)?.status}
+                    />,
+                  ]
+                : []),
             ])
           )
         )}
 
         {section(
-          'Due today',
+          isToday ? 'Due today' : 'Due that day',
           brief.dueToday.length === 0 ? (
-            <EmptyState text="Nothing due today." />
+            <EmptyState text={isToday ? 'Nothing due today.' : `Nothing due ${formatDateKey(day)}.`} />
           ) : (
-            brief.dueToday.map((item) => taskRow(item))
+            <RowGroup>{brief.dueToday.map((item) => taskRow(item))}</RowGroup>
           )
         )}
 
-        {brief.stillOpen.length > 0 && section('Still open', brief.stillOpen.map((item) => taskRow(item, 'stillOpen')))}
+        {brief.stillOpen.length > 0 &&
+          section(
+            'Still open',
+            <RowGroup>{brief.stillOpen.map((item) => taskRow(item, 'stillOpen'))}</RowGroup>,
+            isToday && (
+              <Pressable
+                onPress={async () => {
+                  for (const item of brief.stillOpen) await moveTask(db, item.id, day);
+                  changed();
+                }}
+                accessibilityRole="button"
+                hitSlop={10}
+                style={styles.headAction}>
+                <ThemedText type="smallBold">Move all to today</ThemedText>
+              </Pressable>
+            )
+          )}
 
         {brief.comingUp.length > 0 &&
           section(
             'Coming up this week',
-            brief.comingUp.map((item) => (
-              <Pressable key={item.key} onPress={() => open(item)} style={styles.row}>
-                <View style={[styles.bar, { backgroundColor: item.color }]} />
-                <View style={styles.flex}>
-                  <ThemedText type="smallBold" numberOfLines={2}>
-                    {item.title}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {item.itemType === 'exam' ? 'Test' : 'Due'} {formatDateKey(item.startDay)}
-                    {item.time ? `, ${formatShortTime(item.time)}` : ''}
-                    {brief.planned[item.key] ? ` · ${brief.planned[item.key]} study session${brief.planned[item.key] === 1 ? '' : 's'} planned` : ''}
-                  </ThemedText>
-                </View>
-                <ThemedText
-                  type="small"
-                  style={{ color: item.itemType === 'exam' ? theme.danger : theme.textSecondary }}>
-                  {untilText(item.startDay, day)}
-                </ThemedText>
-              </Pressable>
-            ))
+            <RowGroup>
+              {brief.comingUp.map((item) => (
+                <ItemRow
+                  key={item.key}
+                  item={item}
+                  subtitle={`${item.itemType === 'exam' ? 'Test' : 'Due'} ${formatDateKey(item.startDay)}${
+                    item.time ? `, ${formatShortTime(item.time)}` : ''
+                  }${
+                    brief.planned[item.key]
+                      ? ` · ${brief.planned[item.key]} study session${brief.planned[item.key] === 1 ? '' : 's'} planned`
+                      : ''
+                  }`}
+                  onOpen={() => open(item)}
+                  onToggle={() => toggle(item)}
+                  onChanged={reload}
+                  trailing={
+                    // Red only when a test is today or tomorrow, so it still means "urgent".
+                    <ThemedText
+                      type="small"
+                      style={{
+                        color:
+                          item.itemType === 'exam' && daysBetween(day, item.startDay) <= 1 ? theme.danger : theme.textSecondary,
+                      }}>
+                      {untilText(item.startDay, day)}
+                    </ThemedText>
+                  }
+                />
+              ))}
+            </RowGroup>
           )}
 
         <ReminderLink kind="morning" />
-        <Button title="Open calendar" onPress={() => router.navigate({ pathname: '/calendar', params: { date: day } })} />
+        <Button title="Open calendar" variant="ghost" onPress={() => router.navigate({ pathname: '/calendar', params: { date: day } })} />
       </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -293,31 +358,28 @@ export default function TodayScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, marginTop: Spacing.one },
-  month: { fontSize: 30, lineHeight: 34, fontWeight: 400, letterSpacing: 0.5 },
+  dateRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.three, marginTop: Spacing.one },
+  month: { fontSize: 28, lineHeight: 34, fontWeight: 600 },
   divider: { width: 1, alignSelf: 'stretch' },
   dateSide: { gap: 2 },
   sideNumber: { fontSize: 26, lineHeight: 30, fontWeight: 600, fontVariant: ['tabular-nums'] },
   rule: { height: 1, marginTop: Spacing.three },
   summary: { marginTop: Spacing.three },
-  eventCard: { borderRadius: 20, padding: Spacing.three + 2, gap: Spacing.three, minHeight: 116 },
+  eventCard: { borderRadius: Radius.lg, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   eventTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
   eventTitle: { flex: 1, fontSize: 22, lineHeight: 26, fontWeight: 800, letterSpacing: -0.4 },
   eventTime: { fontSize: 15, fontWeight: 600, fontVariant: ['tabular-nums'] },
-  eventBottom: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, marginTop: 'auto' },
+  eventBottom: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chip: { borderRadius: 999, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one + 2 },
-  section: { gap: Spacing.two + 4, marginTop: Spacing.two },
-  sectionTitle: { fontSize: 20, lineHeight: 24, fontWeight: 800, letterSpacing: -0.3 },
+  chip: { borderRadius: Radius.full, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
+  section: { gap: Spacing.twoHalf, marginTop: Spacing.two },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  headAction: { minHeight: 32, justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
-  time: { width: 64, fontVariant: ['tabular-nums'] },
-  bar: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
+  time: { minWidth: 64, fontVariant: ['tabular-nums'] },
   freeBar: { width: 4, alignSelf: 'stretch', borderLeftWidth: 2, borderStyle: 'dashed' },
   nowRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   nowLine: { flex: 1, height: 2, borderRadius: 1 },
-  check: { fontSize: 20, lineHeight: 24, width: 22 },
   flex: { flex: 1, gap: 2 },
   details: { fontStyle: 'italic' },
-  done: { textDecorationLine: 'line-through' },
-  smallButton: { borderWidth: 1, borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: 2 },
 });

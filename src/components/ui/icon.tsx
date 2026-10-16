@@ -1,5 +1,5 @@
 import { SymbolView, type SymbolWeight } from 'expo-symbols';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/hooks/use-theme';
 
@@ -19,12 +19,15 @@ const NAMES = {
   empty: { ios: 'leaf', android: 'eco', web: 'eco' },
   close: { ios: 'xmark', android: 'close', web: 'close' },
   add: { ios: 'plus', android: 'add', web: 'add' },
+  minus: { ios: 'minus', android: 'remove', web: 'remove' },
+  sparkles: { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' },
+  send: { ios: 'arrow.up', android: 'arrow_upward', web: 'arrow_upward' },
   home: { ios: 'house', android: 'home', web: 'home' },
   homeFilled: { ios: 'house.fill', android: 'home', web: 'home' },
   brief: { ios: 'doc.text', android: 'article', web: 'article' },
   briefFilled: { ios: 'doc.text.fill', android: 'article', web: 'article' },
-  moon: { ios: 'moon.zzz', android: 'bedtime', web: 'bedtime' },
-  moonFilled: { ios: 'moon.zzz.fill', android: 'bedtime', web: 'bedtime' },
+  moon: { ios: 'moon', android: 'bedtime', web: 'bedtime' },
+  moonFilled: { ios: 'moon.fill', android: 'bedtime', web: 'bedtime' },
   calendar: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' },
   calendarFilled: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' },
   bell: { ios: 'bell', android: 'notifications', web: 'notifications' },
@@ -52,10 +55,15 @@ type Props = {
   color?: string;
   weight?: SymbolWeight;
   style?: StyleProp<ViewStyle>;
+  /** Keep the size as given instead of following the phone's text size (tab bar and other chrome). */
+  fixed?: boolean;
 };
 
-export function Icon({ name, size = 20, color, weight = 'medium', style }: Props) {
+export function Icon({ name, size: base = 20, color, weight = 'medium', style, fixed }: Props) {
   const theme = useTheme();
+  // Grow with Dynamic Type like the text beside it, up to 1.6×.
+  const { fontScale } = useWindowDimensions();
+  const size = fixed ? base : Math.round(base * Math.min(Math.max(fontScale, 1), 1.6));
   return (
     <SymbolView
       name={NAMES[name]}

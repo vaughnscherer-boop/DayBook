@@ -45,6 +45,8 @@ export type GroupDraft = {
   office_hours: string | null;
   /** The grade categories the syllabus lists (percent weights). */
   grading: { name: string; weight: number; drop_lowest: number }[];
+  /** Absences the attendance policy allows, when the syllabus says. */
+  absence_limit: number | null;
 };
 /** The term the syllabus covers, with the breaks it lists. */
 export type TermDraft = { starts_on: string; ends_on: string; breaks: TermBreak[] };
@@ -177,6 +179,7 @@ export function buildImportPlan(schedule: ScheduleImport, choices: CourseChoice[
       grading: (course.grading ?? [])
         .filter((line) => line.name.trim() && Number.isFinite(line.weight) && line.weight > 0)
         .map((line) => ({ name: line.name.trim(), weight: line.weight, drop_lowest: line.drop_lowest ?? 0 })),
+      absence_limit: Number.isInteger(course.absence_limit) && course.absence_limit! >= 0 ? course.absence_limit! : null,
     });
 
     for (const meeting of pickedMeetings) {

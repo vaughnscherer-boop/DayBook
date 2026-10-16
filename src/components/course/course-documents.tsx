@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { listGroupImports, undoImport, type ImportRecord } from '@/db/imports';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/confirm';
@@ -65,6 +65,6 @@ export function CourseDocuments({ groupId, onChanged }: Props) {
 
 const styles = StyleSheet.create({
   list: { gap: Spacing.two },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Spacing.two, padding: Spacing.two },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Radius.sm, padding: Spacing.two },
   flex: { flex: 1 },
 });

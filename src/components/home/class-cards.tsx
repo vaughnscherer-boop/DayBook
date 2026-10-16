@@ -3,12 +3,13 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { MergeClassesPrompt } from '@/components/home/merge-classes-prompt';
 import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui/chip';
 import { Icon } from '@/components/ui/icon';
 import { MenuButton } from '@/components/ui/menu-button';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { deleteGroup, type Group } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
 import type { CalendarItem } from '@/lib/calendar-items';
@@ -52,6 +53,7 @@ export function ClassCards({ groups: allGroups, classIds, activeIds, upcoming, g
 
   return (
     <View style={styles.container}>
+      <MergeClassesPrompt groups={groups} upcoming={upcoming} onChanged={onChanged} />
       {others.length > 0 && (
         <View style={styles.tabs}>
           <Chip label={`Classes (${classes.length})`} selected={tab === 'classes'} onPress={() => setTab('classes')} />
@@ -141,17 +143,17 @@ export function ClassCards({ groups: allGroups, classIds, activeIds, upcoming, g
 }
 
 const styles = StyleSheet.create({
-  container: { gap: Spacing.two + 4 },
+  container: { gap: Spacing.twoHalf },
   tabs: { flexDirection: 'row', gap: Spacing.two },
-  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: Spacing.three, gap: Spacing.two + 2 },
+  card: { borderRadius: Radius.lg, borderCurve: 'continuous', borderWidth: StyleSheet.hairlineWidth, padding: Spacing.three, gap: Spacing.twoHalf },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: Spacing.two + 2,
-    paddingVertical: Spacing.one + 1,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.twoHalf,
+    paddingVertical: Spacing.one,
   },
   more: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },

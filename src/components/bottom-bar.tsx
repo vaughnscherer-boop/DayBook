@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/ui/icon';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { Spacing } from '@/constants/theme';
+import { Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { tap } from '@/lib/haptics';
 
@@ -34,7 +34,13 @@ function TabButton({ icon, focusedIcon, label, isFocused, onPress, ...rest }: Ta
       accessibilityState={{ selected: isFocused }}
       hitSlop={6}
       style={styles.tab}>
-      <Icon name={isFocused ? focusedIcon : icon} size={23} color={isFocused ? theme.accent : theme.textSecondary} />
+      <Icon
+        fixed
+        name={isFocused ? focusedIcon : icon}
+        // Calendar has no filled symbol, so the selected tab also gets a heavier stroke.
+        weight={isFocused ? 'semibold' : 'medium'}
+        size={23}
+        color={isFocused ? theme.accent : theme.textSecondary} />
       <View style={[styles.indicator, { backgroundColor: isFocused ? theme.accent : 'transparent' }]} />
     </Pressable>
   );
@@ -62,7 +68,7 @@ export function BottomBar() {
           accessibilityRole="button"
           accessibilityLabel="Add an event or task"
           style={[styles.add, { backgroundColor: theme.accent }]}>
-          <Icon name="add" size={26} weight="semibold" color={theme.onAccent} />
+          <Icon fixed name="add" size={26} weight="semibold" color={theme.onAccent} />
         </PressableScale>
         <TabTrigger name="tomorrow" asChild>
           <TabButton icon="moon" focusedIcon="moonFilled" label="New tasks" />
@@ -87,7 +93,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: Spacing.two,
-    boxShadow: '0 8px 28px rgba(22, 22, 22, 0.14), 0 1px 3px rgba(22, 22, 22, 0.06)',
+    boxShadow: Shadow.floating,
   },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%', gap: 5 },
   indicator: { width: 4, height: 4, borderRadius: 2 },

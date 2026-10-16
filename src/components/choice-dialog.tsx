@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Overlay, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type Choice = { label: string; style?: 'default' | 'destructive' | 'cancel'; onPress?: () => void };
@@ -63,7 +63,7 @@ export function useChoiceDialog(): [ReactNode, (title: string, message: string |
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: Overlay,
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.four,
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   card: {
     width: 300,
     maxWidth: '100%',
-    borderRadius: Spacing.four,
+    borderRadius: Radius.lg, borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
     paddingTop: Spacing.four,
     overflow: 'hidden',

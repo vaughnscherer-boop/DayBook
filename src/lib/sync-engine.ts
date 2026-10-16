@@ -42,6 +42,8 @@ const TABLES: Record<string, { key: string[]; changedColumn: string }> = {
   terms: { key: ['id'], changedColumn: 'updated_at' },
   task_completions: { key: ['task_id', 'date'], changedColumn: 'completed_at' },
   imports: { key: ['id'], changedColumn: 'created_at' },
+  focus_sessions: { key: ['id'], changedColumn: 'updated_at' },
+  attendance: { key: ['id'], changedColumn: 'updated_at' },
 };
 
 const PUSH_BATCH = 200;

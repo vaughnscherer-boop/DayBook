@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   container: { gap: Spacing.three },
   loading: { alignSelf: 'flex-start' },
   link: { paddingVertical: Spacing.one },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two + 4 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.twoHalf },
   dot: { width: 10, height: 10, borderRadius: 5 },
   flex: { flex: 1 },
   actions: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },

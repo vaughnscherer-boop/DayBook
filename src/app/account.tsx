@@ -5,10 +5,10 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { SignInForm } from '@/components/sign-in-form';
 import { ThemedText } from '@/components/themed-text';
+import { CloseToolbar } from '@/components/ui/close-button';
 import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
-import { nativeOnly } from '@/components/ui/back-arrow';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive } from '@/lib/confirm';
 import { supabase } from '@/lib/supabase';
@@ -36,13 +36,10 @@ export default function AccountScreen() {
       <Stack.Screen
         options={{
           title: 'Account',
-          headerLeft: nativeOnly(() => (
-            <Pressable onPress={close} hitSlop={8}>
-              <ThemedText style={{ color: theme.accent }}>Close</ThemedText>
-            </Pressable>
-          )),
         }}
       />
+      {/* Same Close on the right as Settings, which opens this. */}
+      <CloseToolbar onPress={close} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {status.state === 'unconfigured' && (
           <ThemedText themeColor="textSecondary">
@@ -84,6 +81,6 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Spacing.three, gap: Spacing.three },
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.three },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

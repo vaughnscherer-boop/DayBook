@@ -40,7 +40,9 @@ export function filterItems(
 ): CalendarItem[] {
   const end = shiftKey(today, days - 1);
   const ahead = (item: CalendarItem) => item.startDay >= today && item.startDay <= end;
-  const unfinishedTask = (item: CalendarItem) => item.kind === 'task' && !item.done;
+  // Past work added after it was due (a syllabus imported mid-term) isn't open or overdue, like in Today's brief.
+  const unfinishedTask = (item: CalendarItem) =>
+    item.kind === 'task' && !item.done && (item.startDay >= today || item.createdDay <= item.startDay);
   const picked = items.filter((item) => {
     switch (filter) {
       case 'open':
@@ -57,6 +59,9 @@ export function filterItems(
     (a, b) => a.startDay.localeCompare(b.startDay) || (a.time ?? '').localeCompare(b.time ?? '')
   );
 }
+
+/** The app icon's number on `day`: unfinished tasks that are overdue or due that day. */
+export const badgeCount = (items: CalendarItem[], day: string) => filterItems(items, 'open', day, 1).length;
 
 /** Everything on today's calendar. */
 export const todayItems = (items: CalendarItem[], today: string) => itemsOnDay(items, today);

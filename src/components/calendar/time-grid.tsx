@@ -231,7 +231,7 @@ export function TimeGrid({ days, items, wide, onOpenDay, onOpenItem, onToggleTas
               <View
                 key={hour}
                 pointerEvents="none"
-                style={[styles.hourLine, { top: hour * hourHeight, borderColor: lineColor }]}
+                style={[styles.hourLine, { top: hour * hourHeight, borderColor: columnLine }]}
               />
             ))}
 
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   hours: { flexDirection: 'row' },
   hourLabel: { position: 'absolute', right: Spacing.two, fontSize: 10, lineHeight: 14 },
   columns: { flex: 1, flexDirection: 'row' },
-  hourLine: { position: 'absolute', left: 0, right: 0, borderTopWidth: StyleSheet.hairlineWidth },
+  hourLine: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1 },
   column: { flex: 1, minWidth: 0 },
   block: { position: 'absolute', paddingLeft: 1, paddingRight: 2 },
   blockFill: { flex: 1, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4, overflow: 'hidden', gap: 1 },

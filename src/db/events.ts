@@ -28,6 +28,8 @@ export type CalendarEvent = {
   feed_id: string | null; // the school-site feed that added it
   feed_uid: string | null; // that site's own id for it
   feed_hash: string | null; // the feed's version when last applied
+  reminders: string | null; // JSON reminder tokens; null = defaults for its type, [] = none
+  task_id: string | null; // the task a planned work block is for
   created_at: string;
   updated_at: string;
 };
@@ -48,6 +50,10 @@ export type EventInput = {
   group?: GroupChoice;
   /** Class, exam, assignment...; null = guess from the title. Leave out to keep the current one. */
   item_type?: ItemType | null;
+  /** Reminder tokens ("1h", "eve-before"…); null = defaults for its type. Leave out to keep the current ones. */
+  reminders?: string[] | null;
+  /** A work block planned for this task (removed when the task is ticked off). */
+  task_id?: string | null;
 };
 
 export async function listEvents(db: SQLiteDatabase): Promise<CalendarEvent[]> {
@@ -82,6 +88,10 @@ export async function createEvent(db: SQLiteDatabase, input: EventInput): Promis
     now,
     now
   );
+  if (input.reminders !== undefined && input.reminders !== null) {
+    await db.runAsync('UPDATE events SET reminders = ? WHERE id = ?', JSON.stringify(input.reminders), id);
+  }
+  if (input.task_id) await db.runAsync('UPDATE events SET task_id = ? WHERE id = ?', input.task_id, id);
   return id;
 }
 
@@ -105,6 +115,9 @@ export async function updateEvent(db: SQLiteDatabase, id: string, input: EventIn
   await setGroupColumns(db, 'events', id, input.group);
   if (input.item_type !== undefined) {
     await db.runAsync('UPDATE events SET item_type = ? WHERE id = ?', input.item_type, id);
+  }
+  if (input.reminders !== undefined) {
+    await db.runAsync('UPDATE events SET reminders = ? WHERE id = ?', input.reminders && JSON.stringify(input.reminders), id);
   }
 }
 
@@ -141,4 +154,9 @@ export async function deleteEvents(db: SQLiteDatabase, ids: string[]) {
   await db.withTransactionAsync(async () => {
     for (const id of ids) await deleteEvent(db, id);
   });
+}
+
+/** Work blocks planned for a task that haven't started yet: not needed once it's done. */
+export async function removeFutureBlocks(db: SQLiteDatabase, taskId: string, nowKey: string) {
+  await db.runAsync('DELETE FROM events WHERE task_id = ? AND starts_at > ?', taskId, nowKey);
 }

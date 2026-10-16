@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 
 type Props = {
   details: string;
@@ -27,7 +27,7 @@ export function SyllabusDetails({ details, course, color }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Spacing.three, flexDirection: 'row', overflow: 'hidden' },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', flexDirection: 'row', overflow: 'hidden' },
   accent: { width: 4 },
   body: { flex: 1, padding: Spacing.three, gap: Spacing.one },
 });

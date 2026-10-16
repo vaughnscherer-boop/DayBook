@@ -4,7 +4,7 @@ import { Calendar } from 'react-native-calendars';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Overlay, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addMonths, fromKey, toDateKey } from '@/lib/dates';
 
@@ -82,7 +82,7 @@ export function JumpToDate({ visible, date, onPick, onClose }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: Overlay,
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.four,
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   card: {
     width: 340,
     maxWidth: '100%',
-    borderRadius: Spacing.four,
+    borderRadius: Radius.lg, borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.three,
     gap: Spacing.two,

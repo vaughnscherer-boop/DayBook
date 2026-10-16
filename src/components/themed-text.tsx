@@ -9,6 +9,9 @@ export type ThemedTextProps = TextProps & {
     | 'display'
     | 'title'
     | 'subtitle'
+    | 'heading'
+    | 'label'
+    | 'sectionLabel'
     | 'small'
     | 'smallBold'
     | 'caption'
@@ -18,13 +21,25 @@ export type ThemedTextProps = TextProps & {
   themeColor?: ThemeColor;
 };
 
+/**
+ * How far the big decorative sizes may grow with the phone's text size; past this they push dates and
+ * clocks off-screen. Body text scales fully.
+ */
+const MAX_SCALE: Partial<Record<NonNullable<ThemedTextProps['type']>, number>> = {
+  display: 1.2,
+  title: 1.3,
+  subtitle: 1.4,
+  heading: 1.6,
+};
+
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
 
   return (
     <Text
+      maxFontSizeMultiplier={MAX_SCALE[type]}
       style={[
-        { color: theme[themeColor ?? 'text'] },
+        { color: theme[themeColor ?? (type === 'sectionLabel' ? 'textSecondary' : 'text')] },
         type === 'default' && styles.default,
         type === 'display' && styles.display,
         type === 'title' && styles.title,
@@ -32,6 +47,9 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'smallBold' && styles.smallBold,
         type === 'caption' && styles.caption,
         type === 'subtitle' && styles.subtitle,
+        type === 'heading' && styles.heading,
+        type === 'label' && styles.label,
+        type === 'sectionLabel' && styles.sectionLabel,
         type === 'link' && styles.link,
         type === 'linkPrimary' && [styles.linkPrimary, { color: theme.accent }],
         type === 'code' && styles.code,
@@ -83,6 +101,27 @@ const styles = StyleSheet.create({
     lineHeight: 38,
     fontWeight: 800,
     letterSpacing: -0.8,
+  },
+  /** Section titles on tab screens: "Overview", "Your day", "Today's plan". */
+  heading: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: 800,
+    letterSpacing: -0.5,
+  },
+  /** Row titles in lists and cards. */
+  label: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: 600,
+  },
+  /** Grouped-list section labels: Settings, editors, the class page. */
+  sectionLabel: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: 700,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   link: {
     lineHeight: 30,

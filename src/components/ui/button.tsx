@@ -2,7 +2,7 @@ import { ActivityIndicator, StyleSheet, type StyleProp, type ViewStyle } from 'r
 
 import { ThemedText } from '@/components/themed-text';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -19,7 +19,7 @@ export function Button({ title, onPress, variant = 'primary', disabled, busy, st
   const theme = useTheme();
   const primary = variant === 'primary';
   const inactive = disabled || busy;
-  const textColor = primary ? (disabled ? theme.textSecondary : theme.onAccent) : theme.accent;
+  const textColor = primary ? theme.onAccent : theme.accent;
 
   return (
     <PressableScale
@@ -29,7 +29,9 @@ export function Button({ title, onPress, variant = 'primary', disabled, busy, st
       accessibilityState={{ disabled: inactive }}
       style={[
         styles.button,
-        primary && { backgroundColor: disabled ? theme.backgroundSelected : theme.accent },
+        primary && { backgroundColor: theme.accent },
+        // Faded rather than greyed out, so it still reads as the main action once it's ready.
+        disabled && styles.disabled,
         variant === 'secondary' && [styles.outlined, { borderColor: theme.text }],
         style,
       ]}>
@@ -44,13 +46,14 @@ export function Button({ title, onPress, variant = 'primary', disabled, busy, st
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 999,
-    paddingVertical: Spacing.two + 4,
+    borderRadius: Radius.full,
+    paddingVertical: Spacing.twoHalf,
     paddingHorizontal: Spacing.four,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
   },
-  outlined: { borderWidth: 1.5 },
+  outlined: { borderWidth: 1 },
+  disabled: { opacity: 0.35 },
   text: { fontSize: 16, lineHeight: 20, fontWeight: 700 },
 });

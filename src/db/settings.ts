@@ -10,6 +10,17 @@ export type Settings = {
   onboardingDone: boolean; // the first-launch intro was finished or skipped on this device
   /** After a task's due time passes: ask whether you did it (true), or clear it without asking. */
   askAboutPastDue: boolean;
+  /** When your day starts and ends ('HH:MM'): free time and study sessions are found between these. */
+  dayStart: string;
+  dayEnd: string;
+  /** Remind about items you haven't set reminders on (tests the evening before, homework before it's due). */
+  defaultReminders: boolean;
+  /** Reminders snoozed from a notification, re-queued each time reminders are rescheduled (this device only). */
+  snoozed: { at: string; title: string; body: string; data: Record<string, unknown> }[];
+  /** A running focus timer (this device only), so its "time's up" notification survives rescheduling. */
+  focus: { taskId: string; title: string; startedAt: string; endsAt: string } | null;
+  /** Class pairs ("idA|idB") you said aren't the same class, so Home stops offering to merge them. */
+  separateClasses: string[];
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -21,10 +32,25 @@ export const DEFAULT_SETTINGS: Settings = {
   deviceId: null,
   onboardingDone: false,
   askAboutPastDue: true,
+  dayStart: '08:00',
+  dayEnd: '21:00',
+  defaultReminders: true,
+  snoozed: [],
+  focus: null,
+  separateClasses: [],
 };
 
-/** Reminder and past-due settings sync across devices (table `preferences`); the rest stay on this device. */
-const SYNCED: readonly (keyof Settings)[] = ['morningTime', 'nightTime', 'morningEnabled', 'nightEnabled', 'askAboutPastDue'];
+/** Reminder, past-due and day-hours settings sync across devices (table `preferences`); the rest stay on this device. */
+const SYNCED: readonly (keyof Settings)[] = [
+  'morningTime',
+  'nightTime',
+  'morningEnabled',
+  'nightEnabled',
+  'askAboutPastDue',
+  'dayStart',
+  'dayEnd',
+  'defaultReminders',
+];
 
 /** Reads all settings, filling in defaults for anything never saved. Values are stored as JSON. */
 export async function getSettings(db: SQLiteDatabase): Promise<Settings> {

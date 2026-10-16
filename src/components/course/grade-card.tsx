@@ -7,7 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
 import { Icon } from '@/components/ui/icon';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { createCategory, deleteCategory, updateCategory, type GradeCategory } from '@/db/grades';
 import type { Group } from '@/db/groups';
 import { useTheme } from '@/hooks/use-theme';
@@ -233,7 +233,7 @@ function Calculator({ categories, items }: { categories: GradeCategory[]; items:
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
   flex: { flex: 1 },
   big: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   value: { minWidth: 56, textAlign: 'right' },
   editor: { gap: Spacing.two },
-  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   input: { fontSize: 15, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: Spacing.one },
   number: { width: 44, textAlign: 'center' },
   calc: { gap: Spacing.two },

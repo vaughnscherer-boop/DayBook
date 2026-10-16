@@ -112,6 +112,14 @@ export function shiftKey(key: string, days: number): string {
   return `${toDateKey(addDays(fromKey(key.slice(0, 10)), days))}${key.slice(10)}`;
 }
 
+/** 45 -> '45 min', 60 -> '1 h', 90 -> '1 h 30 min'. */
+export function formatMinutes(total: number): string {
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  if (!hours) return `${minutes} min`;
+  return minutes ? `${hours} h ${minutes} min` : `${hours} h`;
+}
+
 /** How long from start to end, e.g. '30 min', '1 hr', '1 hr 15 min', '2 days'; null when not after. */
 export function formatDuration(start: Date, end: Date): string | null {
   const minutes = Math.round((end.getTime() - start.getTime()) / 60000);

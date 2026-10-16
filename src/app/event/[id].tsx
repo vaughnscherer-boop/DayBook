@@ -10,24 +10,32 @@ import { DateTimeField } from '@/components/date-time-field';
 import { ExamStudy } from '@/components/course/exam-study';
 import { ScoreField } from '@/components/course/score-field';
 import { GroupChips } from '@/components/group-chips';
+import { KindSwitch } from '@/components/kind-switch';
+import { ReminderPicker } from '@/components/reminder-picker';
 import { RepeatPicker } from '@/components/repeat-picker';
 import { SyllabusDetails } from '@/components/syllabus-details';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TypeChips } from '@/components/type-chips';
 import { nativeOnly } from '@/components/ui/back-arrow';
+import { EmptyState } from '@/components/ui/empty-state';
 import { closeModal } from '@/components/ui/close-button';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { listCalendars, type Calendar } from '@/db/calendars';
 import { addEventException, createEvent, deleteEvent, deleteEvents, getEvent, sameNamedEvents, updateEvent } from '@/db/events';
 import { learnFromPlacement, listGroups, type Group, type GroupChoice } from '@/db/groups';
+import { getSettings } from '@/db/settings';
+import { useConfirmDiscard } from '@/hooks/use-confirm-discard';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmDestructive, notify } from '@/lib/confirm';
+import { notifyDataChanged } from '@/lib/data-events';
 import { daysBetween, formatDuration, fromKey, shiftKey, toDateKey, toDateTimeKey } from '@/lib/dates';
-import { draftGroup, readDraft } from '@/lib/entry-draft';
+import { backToQuickAdd, draftGroup, readDraft, reviewAs } from '@/lib/entry-draft';
 import { detectItemType, isCourseGroup, typeColor, type ItemType } from '@/lib/item-type';
 import { rescheduleAll } from '@/lib/notifications';
+import { showToast } from '@/lib/toast';
 import { parseRule, type RepeatRule } from '@/lib/recurrence';
+import { parseReminders, type ReminderToken } from '@/lib/reminders';
 
 const HOUR = 60 * 60 * 1000;
 
@@ -55,6 +63,9 @@ export default function EventScreen() {
 
   const [title, setTitle] = useState(parsed?.title ?? '');
   const [notes, setNotes] = useState(draft?.notes ?? '');
+  // The title and notes as loaded, to tell whether leaving would lose typing.
+  const [loadedText, setLoadedText] = useState({ title: parsed?.title ?? '', notes: draft?.notes ?? '' });
+  const allowLeave = useConfirmDiscard(title !== loadedText.title || notes !== loadedText.notes);
   const [allDay, setAllDay] = useState(parsed?.allDay ?? false);
   const [startsAt, setStartsAt] = useState(() => (parsed ? fromKey(parsed.starts_at) : defaultStart(start)));
   const [endsAt, setEndsAt] = useState(() =>
@@ -76,6 +87,11 @@ export default function EventScreen() {
   const [repeatUntil, setRepeatUntil] = useState<string | null>(parsed?.repeatUntil ?? null);
   // For repeating events: when the series starts, and which occurrence is being edited.
   const [series, setSeries] = useState<{ start: string; occurrence: string } | null>(null);
+  // Opened from a link to a event that's since been deleted (here or on another device).
+  const [missing, setMissing] = useState(false);
+  // Reminder choice: null = the defaults for its type (and whether those are on in Settings).
+  const [reminders, setReminders] = useState<ReminderToken[] | null>(null);
+  const [defaultRemindersOn, setDefaultRemindersOn] = useState(true);
 
   useEffect(() => {
     listCalendars(db).then((list) => {
@@ -84,9 +100,12 @@ export default function EventScreen() {
       setCalendarId((current) => current ?? list.find((c) => c.is_default)?.id ?? list[0]?.id ?? null);
     });
     listGroups(db).then(setGroups);
+    getSettings(db).then((settings) => setDefaultRemindersOn(settings.defaultReminders));
     if (isNew) return;
     getEvent(db, id).then((event) => {
-      if (!event) return;
+      if (!event) return setMissing(true);
+      setLoadedText({ title: event.title, notes: event.notes ?? '' });
+      setReminders(parseReminders(event.reminders));
       setCalendarId(event.calendar_id);
       setColor(event.color);
       if (event.group_locked) setGroupChoice({ groupId: event.group_id });
@@ -135,21 +154,29 @@ export default function EventScreen() {
       // Keep a hand-picked group (also on a copy split off a series); 'auto' unless you chose one.
       group: groupTouched || groupChoice !== 'auto' ? groupChoice : undefined,
       item_type: itemType,
+      reminders,
     };
-    const finish = async () => {
+    const finish = async (newId?: string) => {
       // Putting an event in a group by hand teaches that group its first word.
       if (groupTouched && groupChoice !== 'auto' && groupChoice.groupId) {
         await learnFromPlacement(db, groupChoice.groupId, title);
       }
       rescheduleAll(db);
+      allowLeave();
       closeModal();
+      if (newId && draft) {
+        showToast(`Added: ${title.trim()}`, async () => {
+          await deleteEvent(db, newId);
+          notifyDataChanged();
+          rescheduleAll(db);
+        });
+      }
       // Typed in quick add: show where it landed.
       if (draft) router.navigate({ pathname: '/calendar', params: { date: input.starts_at.slice(0, 10) } });
     };
 
     if (isNew) {
-      await createEvent(db, input);
-      return finish();
+      return finish(await createEvent(db, input));
     }
     if (!series) {
       await updateEvent(db, id, input);
@@ -185,6 +212,7 @@ export default function EventScreen() {
   const confirmDelete = async () => {
     const done = () => {
       rescheduleAll(db);
+      allowLeave();
       closeModal();
     };
     const removeAll = async () => {
@@ -255,13 +283,31 @@ export default function EventScreen() {
     setGroupTouched(true);
   };
 
+  if (missing) {
+    return (
+      <ThemedView style={[styles.container, styles.content]}>
+        <Stack.Screen
+          options={{
+            title: 'Event', headerRight: () => null,
+            headerLeft: nativeOnly(() => (
+              <Pressable onPress={closeModal} hitSlop={8}>
+                <ThemedText style={{ color: theme.accent }}>Close</ThemedText>
+              </Pressable>
+            )),
+          }}
+        />
+        <EmptyState text="This event was deleted." />
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
       <Stack.Screen
         options={{
-          title: isNew ? 'New Event' : 'Edit Event',
+          title: isNew ? 'New event' : 'Edit event',
           headerLeft: nativeOnly(() => (
-            <Pressable onPress={closeModal} hitSlop={8}>
+            <Pressable onPress={draft ? backToQuickAdd : closeModal} hitSlop={8}>
               <ThemedText style={{ color: theme.accent }}>Cancel</ThemedText>
             </Pressable>
           )),
@@ -275,11 +321,14 @@ export default function EventScreen() {
         }}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {/* Quick add guessed wrong? Switch without retyping. */}
+        {draft && <KindSwitch value="event" onChange={(kind) => kind !== 'event' && reviewAs(kind, draft, title)} />}
         <ThemedView type="backgroundElement" style={styles.group}>
           <TextInput
             value={title}
             onChangeText={setTitle}
             placeholder="Title"
+            returnKeyType="done"
             placeholderTextColor={theme.textSecondary}
             autoFocus={isNew && !draft}
             style={[styles.input, { color: theme.text }]}
@@ -313,6 +362,21 @@ export default function EventScreen() {
             onChange={setEndsAt}
             mode={allDay ? 'date' : 'datetime'}
             hint={allDay ? null : formatDuration(startsAt, endsAt)}
+          />
+        </ThemedView>
+
+        <ThemedView type="backgroundElement" style={styles.group}>
+          <ReminderPicker
+            item={{
+              kind: 'event',
+              itemType: itemType ?? guessedType,
+              allDay,
+              startDay: toDateKey(startsAt),
+              time: allDay ? null : toDateTimeKey(startsAt).slice(11, 16),
+            }}
+            value={reminders}
+            onChange={setReminders}
+            defaultsOn={defaultRemindersOn}
           />
         </ThemedView>
 
@@ -388,7 +452,7 @@ export default function EventScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Spacing.three, gap: Spacing.four },
-  group: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
+  group: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.three },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   input: { fontSize: 17 },
   notes: { minHeight: 80, textAlignVertical: 'top' },

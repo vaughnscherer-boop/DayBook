@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { createEvent } from '@/db/events';
 import { useTheme } from '@/hooks/use-theme';
 import type { CalendarItem } from '@/lib/calendar-items';
@@ -29,6 +29,28 @@ type Props = {
 const range = (session: StudySession) =>
   `${formatDateKey(session.day)}, ${formatTime(`${session.day}T${session.start}`)}–${formatTime(`${session.day}T${session.end}`)}`;
 
+/** Adds sessions as "Study: <exam>" events in the exam's calendar and class. */
+export async function addStudySessions(
+  db: SQLiteDatabase,
+  exam: CalendarItem,
+  calendarId: string | null,
+  sessions: StudySession[]
+) {
+  for (const session of sessions) {
+    await createEvent(db, {
+      // Same exam and day → same id, so two devices accepting the same plan don't double up.
+      id: `study-${exam.id}-${session.day}`,
+      title: studyTitle(exam.title),
+      starts_at: `${session.day}T${session.start}`,
+      ends_at: `${session.day}T${session.end}`,
+      calendar_id: calendarId,
+      group: exam.groupId ? { groupId: exam.groupId } : undefined,
+      item_type: 'other',
+    });
+  }
+  rescheduleAll(db);
+}
+
 /**
  * "Plan study sessions" for an exam: proposes a few hour-long sessions in free time before it. You
  * can drop any you don't want, then add the rest as "Study: <exam>" events (edit them like any event).
@@ -47,19 +69,7 @@ export function StudyPlanner({ exam, calendarId, items, onChanged, picker }: Pro
   const accept = async () => {
     if (!proposal?.length || saving) return;
     setSaving(true);
-    for (const session of proposal) {
-      await createEvent(db, {
-        // Same exam and day → same id, so two devices accepting the same plan don't double up.
-        id: `study-${exam.id}-${session.day}`,
-        title: studyTitle(exam.title),
-        starts_at: `${session.day}T${session.start}`,
-        ends_at: `${session.day}T${session.end}`,
-        calendar_id: calendarId,
-        group: exam.groupId ? { groupId: exam.groupId } : undefined,
-        item_type: 'other',
-      });
-    }
-    rescheduleAll(db);
+    await addStudySessions(db, exam, calendarId, proposal);
     setProposal(null);
     setSaving(false);
     onChanged();
@@ -127,7 +137,7 @@ export function StudyPlanner({ exam, calendarId, items, onChanged, picker }: Pro
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   proposal: { gap: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   flex: { flex: 1 },

@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { ErrorText } from '@/components/ui/error-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { createTask } from '@/db/tasks';
 import { useTheme } from '@/hooks/use-theme';
 import { breakDownOnServer } from '@/lib/breakdown-api';
@@ -59,6 +60,7 @@ export function BreakDown({ title, details, notes, due, calendarId, groupId }: P
         calendar_id: calendarId,
         group: groupId ? { groupId } : undefined,
         item_type: 'other',
+        minutes: step.minutes ?? null,
       });
     }
     rescheduleAll(db);
@@ -97,11 +99,7 @@ export function BreakDown({ title, details, notes, due, calendarId, groupId }: P
           </Pressable>
         </View>
       ))}
-      {error && (
-        <ThemedText type="small" style={{ color: theme.danger }}>
-          {error}
-        </ThemedText>
-      )}
+      {error && <ErrorText error={error} />}
       {steps && steps.length > 0 ? (
         <Button title={`Add ${steps.length} step${steps.length === 1 ? '' : 's'} as tasks`} onPress={accept} busy={busy} />
       ) : (
@@ -117,7 +115,7 @@ export function BreakDown({ title, details, notes, due, calendarId, groupId }: P
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   flex: { flex: 1 },
 });

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatTime, toDateKey } from '@/lib/dates';
 
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'transparent',
-    paddingHorizontal: Spacing.two + 2,
+    paddingHorizontal: Spacing.twoHalf,
     paddingVertical: 6,
   },
   pillText: { fontSize: 15 },
@@ -293,10 +293,10 @@ const styles = StyleSheet.create({
   label: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two, flexShrink: 1 },
   list: {
     width: LIST_WIDTH,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
     paddingVertical: 4,
-    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)',
+    boxShadow: Shadow.raised,
   },
   option: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: Spacing.three },
 });

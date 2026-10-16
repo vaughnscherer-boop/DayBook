@@ -5,7 +5,7 @@ import { Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { getSettings, type Settings } from '@/db/settings';
 import { useTheme } from '@/hooks/use-theme';
 import { formatShortTime } from '@/lib/dates';
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 999,
+    borderRadius: Radius.full,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },

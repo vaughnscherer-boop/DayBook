@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Chip } from '@/components/ui/chip';
 import { Icon, type IconName } from '@/components/ui/icon';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { parseLinks, updateCourseInfo, type CourseLink, type Group } from '@/db/groups';
 import type { Term } from '@/db/terms';
 import { useTheme } from '@/hooks/use-theme';
@@ -167,7 +167,7 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   flex: { flex: 1 },
   field: { fontSize: 15, paddingVertical: Spacing.one },

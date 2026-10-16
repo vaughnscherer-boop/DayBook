@@ -14,13 +14,12 @@ import { TimeGrid } from '@/components/calendar/time-grid';
 import { WeekStrip } from '@/components/calendar/week-strip';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { setOccurrenceDone, setTaskDone } from '@/db/tasks';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { useTheme } from '@/hooks/use-theme';
 import type { CalendarItem } from '@/lib/calendar-items';
 import { addDays, addMonths, fromKey, monthGrid, toDateKey, todayKey, weekDays } from '@/lib/dates';
 import { tap, tick } from '@/lib/haptics';
-import { rescheduleAll } from '@/lib/notifications';
+import { toggleTask } from '@/lib/task-toggle';
 
 const WIDE_BREAKPOINT = 900;
 /** Six week rows plus the weekday row, so every month's grid is the same height. */
@@ -132,15 +131,9 @@ export default function CalendarScreen() {
     setView('day');
   };
 
-  const toggleTask = async (item: CalendarItem) => {
-    // A repeating task is ticked off just for this date.
-    if (item.repeating) await setOccurrenceDone(db, item.id, item.occurrenceDate, !item.done);
-    else await setTaskDone(db, item.id, !item.done);
-    await reload();
-    rescheduleAll(db);
-  };
+  const toggle = (item: CalendarItem) => toggleTask(db, item, reload);
 
-  const viewProps = { items, wide, onOpenItem: openItem, onToggleTask: toggleTask, onOpenDay: openDay };
+  const viewProps = { items, wide, onOpenItem: openItem, onToggleTask: toggle, onOpenDay: openDay };
   const renderPage = (page: -1 | 0 | 1) => {
     const date = shiftFocus(view, focusedDate, page);
     if (view === 'month') {
@@ -148,7 +141,7 @@ export default function CalendarScreen() {
       return <MonthGrid month={date} selected={focusedDate} items={items} onSelect={setFocusedDate} />;
     }
     if (view === 'day') {
-      return <DaySchedule day={date} items={items} groups={groups} onOpenItem={openItem} onToggleTask={toggleTask} />;
+      return <DaySchedule day={date} items={items} groups={groups} onOpenItem={openItem} onToggleTask={toggle} />;
     }
     return (
       <TimeGrid
@@ -181,7 +174,7 @@ export default function CalendarScreen() {
       day={focusedDate}
       items={items}
       onOpenItem={openItem}
-      onToggleTask={toggleTask}
+      onToggleTask={toggle}
       bottomSpace={tabBarSpace + Spacing.three}
     />
   );

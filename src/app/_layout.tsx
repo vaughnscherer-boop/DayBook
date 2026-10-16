@@ -12,6 +12,7 @@ import { NotificationSync } from '@/components/notification-sync';
 import { PastDuePrompt } from '@/components/past-due-prompt';
 import { BackArrow, isWeb } from '@/components/ui/back-arrow';
 import { SyncProvider } from '@/components/sync-provider';
+import { ToastHost } from '@/components/toast-host';
 import { Colors, Spacing } from '@/constants/theme';
 import { migrateDbIfNeeded } from '@/db/migrations';
 
@@ -65,19 +66,19 @@ export default function RootLayout() {
             <Stack.Screen name="task/[id]" options={{ presentation: 'modal' }} />
             <Stack.Screen name="import" options={{ presentation: 'modal' }} />
             <Stack.Screen name="account" options={{ presentation: 'modal', title: 'Account' }} />
-            <Stack.Screen
-              name="new"
-              options={{ presentation: 'formSheet', title: 'Add', sheetAllowedDetents: [0.6, 1], sheetGrabberVisible: true }}
-            />
+            {/* A formSheet here renders its content blank or misplaced on iOS 27, so it's a plain modal. */}
+            <Stack.Screen name="new" options={{ presentation: 'modal', title: 'Add' }} />
             <Stack.Screen name="tasks" options={{ title: 'Tasks', headerBackTitle: 'Home' }} />
             <Stack.Screen name="settings" options={{ presentation: 'modal', title: 'Settings' }} />
             <Stack.Screen name="group/[id]" options={{ presentation: 'modal', title: 'Edit class' }} />
+            <Stack.Screen name="focus/[id]" options={{ presentation: 'fullScreenModal', title: 'Focus' }} />
             <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
             <Stack.Screen
               name="onboarding"
               options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false }}
             />
           </Stack>
+          <ToastHost />
         </SQLiteProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

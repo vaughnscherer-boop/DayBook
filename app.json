@@ -44,8 +44,17 @@
         }
       ],
       "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Daybook reads a photo you pick of a syllabus, handout or whiteboard to add its dates to your calendar.",
+          "cameraPermission": "Daybook reads a photo you take of a syllabus, handout or whiteboard to add its dates to your calendar.",
+          "microphonePermission": false
+        }
+      ],
       "./plugins/without-push-entitlement",
       "./plugins/with-scene-lifecycle",
+      "./plugins/with-siri-shortcut",
       "expo-notifications",
       [
         "expo-calendar",

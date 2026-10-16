@@ -83,6 +83,21 @@ export function courseCode(text: string): { name: string; keyword: string; subje
 }
 
 /**
+ * Whether two class names look like the same course written two ways: the same number, with one
+ * subject the start of the other ("LAT 111" and "Latin 111", "BIO 101" and "Biology 101").
+ */
+export function sameCourse(a: string, b: string): boolean {
+  const parse = (text: string) => {
+    const match = text.match(/\b([A-Za-z]{2,})[\s-]?(\d{3,4}[A-Za-z]?)\b/);
+    return match ? { subject: match[1].toLowerCase(), number: match[2].toLowerCase() } : null;
+  };
+  const x = parse(a);
+  const y = parse(b);
+  if (!x || !y || x.number !== y.number) return false;
+  return x.subject.startsWith(y.subject) || y.subject.startsWith(x.subject);
+}
+
+/**
  * How strongly `title` matches a keyword: its length in letters, or 0. One-word keywords also match
  * longer words they begin ("bio" matches "biology"); longer phrases must appear as written.
  */

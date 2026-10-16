@@ -19,6 +19,9 @@ type Failure = { ok: false; error: string };
  * Calls one of Daybook's Claude features: the hosted Supabase function `fn` for signed-in accounts,
  * or `path` on EXPO_PUBLIC_IMPORT_API_URL / the local `npm run server` while developing.
  */
+/** How every "you need an account for this" error starts; ErrorText adds a Sign in button to these. */
+export const SIGN_IN_FIRST = 'Sign in first';
+
 export async function callServer<T extends { ok: boolean }>(fn: string, path: string, body: unknown): Promise<T | Failure> {
   const base = process.env.EXPO_PUBLIC_IMPORT_API_URL ?? (supabase ? null : localServerUrl());
   if (base) {
@@ -34,7 +37,7 @@ export async function callServer<T extends { ok: boolean }>(fn: string, path: st
     }
   }
   const { data: session } = await supabase!.auth.getSession();
-  if (!session.session) return { ok: false, error: 'Sign in first (side panel → Account): this uses your Daybook account.' };
+  if (!session.session) return { ok: false, error: `${SIGN_IN_FIRST}: this uses your Daybook account.` };
   const { data, error } = await supabase!.functions.invoke<T>(fn, { body: body as Record<string, unknown> });
   if (!error && data) return data;
   if (error instanceof FunctionsHttpError) {

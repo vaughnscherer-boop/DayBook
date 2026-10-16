@@ -8,13 +8,15 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { TaskCheck } from '@/components/ui/task-check';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { itemsOnDay, type CalendarItem } from '@/lib/calendar-items';
 import { formatShortTime, fromKey, monthGrid, todayKey } from '@/lib/dates';
 import { tap } from '@/lib/haptics';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** Seven columns only fit so much: the grid's labels and numbers stop growing past this text size. */
+const GRID_MAX_SCALE = 1.3;
 const TYPE_ICON: Record<CalendarItem['itemType'], IconName> = {
   class: 'class',
   exam: 'exam',
@@ -42,7 +44,13 @@ export function MonthGrid({ month, selected, items, onSelect }: GridProps) {
     <View style={styles.grid}>
       <View style={styles.weekRow}>
         {WEEKDAYS.map((name) => (
-          <ThemedText key={name} type="small" themeColor="textSecondary" style={styles.weekday}>
+          <ThemedText
+            key={name}
+            type="small"
+            themeColor="textSecondary"
+            numberOfLines={1}
+            maxFontSizeMultiplier={GRID_MAX_SCALE}
+            style={styles.weekday}>
             {name}
           </ThemedText>
         ))}
@@ -66,6 +74,7 @@ export function MonthGrid({ month, selected, items, onSelect }: GridProps) {
                 style={styles.cell}>
                 <View style={[styles.number, isSelected && { backgroundColor: theme.accent }]}>
                   <ThemedText
+                    maxFontSizeMultiplier={GRID_MAX_SCALE}
                     style={[
                       styles.numberText,
                       { color: isSelected ? theme.onAccent : inMonth ? theme.text : theme.textSecondary },
@@ -118,7 +127,9 @@ export function DayList({ day, items, onOpenItem, onToggleTask }: ListProps) {
   return (
     <View style={styles.list}>
       <View style={styles.listHead}>
-        <ThemedText style={styles.heading}>{heading}</ThemedText>
+        <ThemedText type="heading" style={styles.flex}>
+          {heading}
+        </ThemedText>
         <PressableScale
           onPress={() => router.push({ pathname: '/event/[id]', params: { id: 'new', start: `${day}T09:00` } })}
           accessibilityLabel="Add on this day"
@@ -174,16 +185,16 @@ const styles = StyleSheet.create({
   weekRow: { flexDirection: 'row' },
   weekday: { flex: 1, textAlign: 'center', paddingBottom: Spacing.two },
   cell: { flex: 1, alignItems: 'center', paddingVertical: 3, gap: 3 },
-  number: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  number: { minWidth: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   numberText: { fontSize: 16, lineHeight: 20, fontWeight: 600, fontVariant: ['tabular-nums'] },
   outside: { opacity: 0.35 },
   today: { fontWeight: 800, textDecorationLine: 'underline' },
   dots: { flexDirection: 'row', gap: 3, height: 5 },
   dot: { width: 5, height: 5, borderRadius: 2.5 },
   list: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three, gap: Spacing.one },
-  listHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.two },
-  heading: { fontSize: 22, lineHeight: 28, fontWeight: 800, letterSpacing: -0.4 },
-  addButton: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  listHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginBottom: Spacing.two },
+  flex: { flex: 1 },
+  addButton: { width: 36, height: 36, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', gap: Spacing.three, paddingVertical: Spacing.three },
   rowIcon: { width: 24, alignItems: 'center', paddingTop: 18 },
   rowText: { flex: 1, gap: 2 },

@@ -3,7 +3,9 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { groupNames, ItemCard, typeLabel } from '@/components/item-card';
+import { groupNames, typeLabel } from '@/components/item-card';
+import { ItemRow, RowGroup } from '@/components/item-row';
+import { SwipeTask } from '@/components/swipe-task';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
@@ -12,14 +14,15 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Spacing } from '@/constants/theme';
 import { addEventException, deleteEvent } from '@/db/events';
-import { addTaskException, deleteTask, setOccurrenceDone, setTaskDone } from '@/db/tasks';
+import { addTaskException, deleteTask, moveTask } from '@/db/tasks';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { useTheme } from '@/hooks/use-theme';
 import type { CalendarItem } from '@/lib/calendar-items';
 import { confirmDestructive } from '@/lib/confirm';
-import { formatShortTime, fromKey, todayKey } from '@/lib/dates';
+import { formatShortTime, fromKey, shiftKey, todayKey } from '@/lib/dates';
 import { redundantItems } from '@/lib/duplicates';
 import { rescheduleAll } from '@/lib/notifications';
+import { toggleTask } from '@/lib/task-toggle';
 import { FILTERS, filterItems, loadRange, rangeDays, RANGES, type OverviewRange, type TaskFilter } from '@/lib/overview';
 
 const EMPTY: Record<TaskFilter, string> = {
@@ -90,9 +93,9 @@ export default function TasksScreen() {
       }
     );
 
-  const toggle = async (item: CalendarItem) => {
-    if (item.repeating) await setOccurrenceDone(db, item.id, item.occurrenceDate, !item.done);
-    else await setTaskDone(db, item.id, !item.done);
+  const toggle = (item: CalendarItem) => toggleTask(db, item, reload);
+  const move = async (item: CalendarItem, date: string) => {
+    await moveTask(db, item.id, date);
     await reload();
     rescheduleAll(db);
   };
@@ -144,7 +147,7 @@ export default function TasksScreen() {
         ))}
       </ScrollView>
       {(filter === 'due' || filter === 'tests' || filter === 'open') && (
-        <ThemedText type="caption" themeColor="textSecondary" style={styles.rangeNote}>
+        <ThemedText type="sectionLabel" style={styles.rangeNote}>
           {RANGES.find((r) => r.value === range)!.label}
         </ThemedText>
       )}
@@ -152,34 +155,47 @@ export default function TasksScreen() {
         {list.length === 0 ? (
           <EmptyState text={EMPTY[filter]} />
         ) : (
-          list.map((item) => (
-            <View key={item.key} style={styles.row}>
-              {selecting && (
-                <Pressable
-                  onPress={() => pick(item)}
-                  hitSlop={8}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected.has(item.key) }}
-                  accessibilityLabel={`Select ${item.title}`}>
-                  <Icon
-                    name={selected.has(item.key) ? 'checked' : 'unchecked'}
-                    size={24}
-                    color={selected.has(item.key) ? theme.danger : theme.textSecondary}
-                  />
-                </Pressable>
-              )}
-              <View style={styles.flex}>
-                <ItemCard
+          <RowGroup>
+            {list.map((item) => (
+              <SwipeTask
+                key={item.key}
+                item={item}
+                enabled={!selecting}
+                surface="backgroundElement"
+                onToggle={() => toggle(item)}
+                moves={[
+                  ...(item.startDay !== today ? [{ label: 'Today', date: today }] : []),
+                  ...(item.startDay !== shiftKey(today, 1) ? [{ label: 'Tomorrow', date: shiftKey(today, 1) }] : []),
+                ]}
+                onMove={(date) => move(item, date)}>
+                <ItemRow
                   item={item}
                   subtitle={[item.groupId ? groupName[item.groupId] : null, typeLabel(item), when(item)]
                     .filter(Boolean)
-                    .join('  ·  ')}
+                    .join(' · ')}
                   onOpen={() => (selecting ? pick(item) : open(item))}
                   onToggle={() => (selecting ? pick(item) : toggle(item))}
+                  onChanged={reload}
+                  leading={
+                    selecting && (
+                      <Pressable
+                        onPress={() => pick(item)}
+                        hitSlop={8}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: selected.has(item.key) }}
+                        accessibilityLabel={`Select ${item.title}`}>
+                        <Icon
+                          name={selected.has(item.key) ? 'checked' : 'unchecked'}
+                          size={24}
+                          color={selected.has(item.key) ? theme.danger : theme.textSecondary}
+                        />
+                      </Pressable>
+                    )
+                  }
                 />
-              </View>
-            </View>
-          ))
+              </SwipeTask>
+            ))}
+          </RowGroup>
         )}
       </ScrollView>
       {selecting && (
@@ -220,10 +236,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   filterBar: { flexGrow: 0 },
   filters: { gap: Spacing.two, paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
-  rangeNote: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two },
-  list: { padding: Spacing.three, gap: Spacing.two + 4, paddingBottom: Spacing.six },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  flex: { flex: 1 },
+  rangeNote: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
+  list: { padding: Spacing.three, paddingBottom: Spacing.six },
   footer: { padding: Spacing.three, gap: Spacing.two, borderTopWidth: StyleSheet.hairlineWidth },
   quick: { flexDirection: 'row', justifyContent: 'space-between' },
 });

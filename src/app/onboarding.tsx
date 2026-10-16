@@ -10,7 +10,7 @@ import { SignInForm } from '@/components/sign-in-form';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { listCalendars, type Calendar } from '@/db/calendars';
 import { setSetting } from '@/db/settings';
 import { useTheme } from '@/hooks/use-theme';
@@ -104,8 +104,8 @@ export default function OnboardingScreen() {
                 One calendar on every device
               </ThemedText>
               <ThemedText themeColor="textSecondary">
-                Sign in on your phone and your computer and they stay in sync. You can also do this later from the
-                side panel.
+                Sign in on your phone and your computer and they stay in sync. You can also do this later from
+                Settings.
               </ThemedText>
               {signedIn ? (
                 <ThemedView type="backgroundElement" style={styles.card}>
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   feature: { flexDirection: 'row', gap: Spacing.three, alignItems: 'flex-start' },
   icon: { fontSize: 26, lineHeight: 32 },
   flex: { flex: 1, gap: 2 },
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.one },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.one },
   footer: { padding: Spacing.three, gap: Spacing.two, maxWidth: 560, width: '100%', alignSelf: 'center' },
   secondary: { alignItems: 'center', paddingVertical: Spacing.two },
 });

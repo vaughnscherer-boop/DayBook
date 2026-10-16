@@ -19,6 +19,7 @@ export type Group = {
   office_hours: string | null;
   links: string; // JSON CourseLink[]
   archived: 0 | 1; // 1 = its term ended: hidden from Home, items kept
+  absence_limit: number | null; // absences the syllabus allows, if known
   created_at: string;
   updated_at: string;
 };
@@ -169,6 +170,17 @@ export async function mergeGroups(db: SQLiteDatabase, fromId: string, intoId: st
   if (!from || !into || from.id === into.id) return;
   const keywords = [...new Set([...JSON.parse(into.keywords), ...JSON.parse(from.keywords)])];
   await db.withTransactionAsync(async () => {
+    // A group lives in one calendar, so its items move there too (not ones a school-site feed owns).
+    if (from.calendar_id !== into.calendar_id) {
+      for (const table of ['events', 'tasks']) {
+        await db.runAsync(
+          `UPDATE ${table} SET calendar_id = ?, updated_at = ? WHERE group_id = ? AND feed_id IS NULL`,
+          into.calendar_id,
+          new Date().toISOString(),
+          fromId
+        );
+      }
+    }
     await db.runAsync('UPDATE events SET group_id = ? WHERE group_id = ?', intoId, fromId);
     await db.runAsync('UPDATE tasks SET group_id = ? WHERE group_id = ?', intoId, fromId);
     // Its grade categories come along, unless the other class already has the same-named one.

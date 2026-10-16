@@ -4,7 +4,7 @@ import { Platform, Pressable, StyleSheet, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { signInWithGoogle } from '@/lib/google';
 import { supabase } from '@/lib/supabase';
@@ -125,7 +125,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
+  card: { borderRadius: Radius.md, borderCurve: 'continuous', padding: Spacing.three, gap: Spacing.three },
   or: { textAlign: 'center' },
   input: { fontSize: 17, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: Spacing.two },
 });

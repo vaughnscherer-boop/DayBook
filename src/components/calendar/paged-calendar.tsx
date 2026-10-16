@@ -63,10 +63,13 @@ export function PagedCalendar({ axis, pageKey, pageKeys, renderPage, onNext, onP
       ? basePan.activeOffsetX([-15, 15]).failOffsetY([-25, 25])
       : basePan.activeOffsetY([-15, 15]).failOffsetX([-25, 25])
   )
+    // Worklets: the page follows the finger on the UI thread, even while JS is busy.
     .onUpdate((e) => {
+      'worklet';
       offset.set(horizontal ? e.translationX : e.translationY);
     })
     .onEnd((e) => {
+      'worklet';
       const moved = horizontal ? e.translationX : e.translationY;
       const velocity = horizontal ? e.velocityX : e.velocityY;
       const toNext = moved < -size * SNAP_FRACTION || velocity < -FLICK_VELOCITY;

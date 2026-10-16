@@ -32,6 +32,12 @@ export type CalendarItem = {
   startsAt: string | null; // events only, 'YYYY-MM-DDTHH:MM'
   endsAt: string | null;
   done: boolean;
+  /** Reminders picked for it (JSON tokens); null = the defaults for its type. */
+  reminders: string | null;
+  /** Tasks: estimated minutes, when known. */
+  minutes: number | null;
+  /** Events: the task this is a planned work block for. */
+  taskId: string | null;
 };
 
 /** The dates an event/task series occurs within [rangeStart, rangeEnd]; one-offs give their own date. */
@@ -101,6 +107,9 @@ export function buildItems(
         startsAt,
         endsAt,
         done: false,
+        reminders: event.reminders,
+        minutes: null,
+        taskId: event.task_id,
       });
     }
   }
@@ -129,6 +138,9 @@ export function buildItems(
         startsAt: null,
         endsAt: null,
         done: repeating ? completed.has(`${task.id}|${date}`) : task.done === 1,
+        reminders: task.reminders,
+        minutes: task.minutes,
+        taskId: null,
       });
     }
   }
@@ -191,9 +203,17 @@ export function tint(hex: string, alpha: number): string {
     .padStart(2, '0')}`;
 }
 
-/** Black or white, whichever reads better on `hex`. */
+const channel = (c: number) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+/** WCAG relative luminance of a '#rrggbb' color. */
+function luminance(hex: string) {
+  const n = parseInt(hex.slice(1, 7), 16);
+  return 0.2126 * channel(n >> 16) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255);
+}
+
+/** Ink that reads on a color block: white when it reaches WCAG AA (4.5:1), else whichever contrasts more. */
 export function textOn(hex: string): string {
-  const n = parseInt(hex.slice(1), 16);
-  const luminance = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
-  return luminance > 0.7 ? '#000000' : '#ffffff';
+  const l = luminance(hex);
+  const onWhite = 1.05 / (l + 0.05);
+  const onInk = (l + 0.05) / 0.0585; // #161616
+  return onWhite >= 4.5 || onWhite >= onInk ? '#ffffff' : '#161616';
 }

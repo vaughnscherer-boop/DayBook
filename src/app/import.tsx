@@ -2,15 +2,16 @@ import { randomUUID } from 'expo-crypto';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { CalendarChips } from '@/components/calendar-chips';
 import { ImportCourseCard } from '@/components/import-course-card';
 import { ThemedText } from '@/components/themed-text';
+import { ErrorText } from '@/components/ui/error-text';
 import { Button } from '@/components/ui/button';
 import { ThemedView } from '@/components/themed-view';
 import { nativeOnly } from '@/components/ui/back-arrow';
-import { EventColors, Spacing } from '@/constants/theme';
+import { EventColors, Radius, Spacing } from '@/constants/theme';
 import { createCalendar, listCalendars, type Calendar } from '@/db/calendars';
 import { listGroups, type Group } from '@/db/groups';
 import { listGroupImports, listImports, saveImport, undoImport, type ImportRecord } from '@/db/imports';
@@ -21,7 +22,8 @@ import { todayKey } from '@/lib/dates';
 import { readScheduleOnServer } from '@/lib/import-api';
 import { buildImportPlan, countPlan, defaultChoice, type CourseChoice } from '@/lib/import-schedule';
 import { rescheduleAll } from '@/lib/notifications';
-import { pickScheduleFile, type PickedFile } from '@/lib/pick-schedule';
+import { takePendingPaste } from '@/lib/paste-draft';
+import { photosAvailable, pickScheduleFile, pickSchedulePhoto, type PickedFile } from '@/lib/pick-schedule';
 import { MAX_IMPORT_TEXT, TEXT_IMPORT, type ScheduleImport } from '@/lib/schedule-format';
 
 type Step =
@@ -39,7 +41,7 @@ const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
  * class's page (`groupId`), it adds the document to that class only.
  */
 export default function ImportScreen() {
-  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  const { groupId, paste } = useLocalSearchParams<{ groupId?: string; paste?: string }>();
   const db = useSQLiteContext();
   const theme = useTheme();
   const [step, setStep] = useState<Step>({ kind: 'start' });
@@ -48,7 +50,8 @@ export default function ImportScreen() {
   const [calendarId, setCalendarId] = useState<string | null>(null);
   const [imports, setImports] = useState<ImportRecord[]>([]);
   const [saving, setSaving] = useState(false);
-  const [pasted, setPasted] = useState('');
+  // Opened from quick add's Paste button with a whole page: start with that text in the box.
+  const [pasted, setPasted] = useState(() => (paste ? (takePendingPaste() ?? '') : ''));
   const [course, setCourse] = useState<Group | null>(null);
 
   const loadImports = () => (groupId ? listGroupImports(db, groupId) : listImports(db));
@@ -60,8 +63,8 @@ export default function ImportScreen() {
 
   const school = calendars.find((c) => /school|class/i.test(c.name));
 
-  const pick = async () => {
-    const picked = await pickScheduleFile();
+  const pick = async (from: 'file' | 'camera' | 'library' = 'file') => {
+    const picked = from === 'file' ? await pickScheduleFile() : await pickSchedulePhoto(from);
     if (picked.kind === 'cancelled') return;
     if (picked.kind === 'error') {
       setStep({ kind: 'start', error: picked.message });
@@ -174,11 +177,15 @@ export default function ImportScreen() {
               ? 'Pick a syllabus, schedule, assignment sheet or exam guide for this class. Everything Daybook finds goes into this class, and you choose what to add first.'
               : 'Pick a PDF or a screenshot. Daybook reads your class times, exams, homework and breaks, and you choose what to add before anything changes.'}
           </ThemedText>
-          <Button title="Choose file…" onPress={pick} />
+          <Button title="Choose file…" onPress={() => pick()} />
+          {photosAvailable && Platform.OS !== 'web' && (
+            <View style={styles.photoRow}>
+              <Button title="Take photo" variant="secondary" onPress={() => pick('camera')} style={styles.flex} />
+              <Button title="Choose photo" variant="secondary" onPress={() => pick('library')} style={styles.flex} />
+            </View>
+          )}
           <View style={styles.block}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              OR PASTE A PAGE
-            </ThemedText>
+            <ThemedText type="sectionLabel">Or paste a page</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               On a Moodle, Canvas or other school page, select all, copy, and paste it here. Daybook finds the due dates
               and exams.
@@ -193,16 +200,10 @@ export default function ImportScreen() {
             />
             <Button title="Read pasted text" onPress={readPasted} disabled={pasted.trim().length < 20} />
           </View>
-          {step.error && (
-            <ThemedText type="small" style={{ color: theme.danger }}>
-              {step.error}
-            </ThemedText>
-          )}
+          {step.error && <ErrorText error={step.error} />}
           {imports.length > 0 && (
             <View style={styles.block}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                IMPORTED
-              </ThemedText>
+              <ThemedText type="sectionLabel">Imported</ThemedText>
               {imports.map((record) => (
                 <ThemedView key={record.id} type="backgroundElement" style={styles.importRow}>
                   <View style={styles.flex}>
@@ -298,14 +299,15 @@ export default function ImportScreen() {
 }
 
 const styles = StyleSheet.create({
+  photoRow: { flexDirection: 'row', gap: Spacing.two },
   container: { flex: 1 },
   content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
   block: { gap: Spacing.two },
-  importRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Spacing.two, padding: Spacing.two },
+  importRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Radius.sm, padding: Spacing.two },
   flex: { flex: 1 },
-  paste: { minHeight: 120, maxHeight: 240, borderRadius: Spacing.two, padding: Spacing.two, fontSize: 15, textAlignVertical: 'top' },
+  paste: { minHeight: 120, maxHeight: 240, borderRadius: Radius.sm, padding: Spacing.two, fontSize: 15, textAlignVertical: 'top' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },
   centerText: { textAlign: 'center' },
-  warnings: { borderRadius: Spacing.two, padding: Spacing.three, gap: Spacing.one, borderLeftWidth: 3 },
+  warnings: { borderRadius: Radius.sm, padding: Spacing.three, gap: Spacing.one, borderLeftWidth: 3 },
   footer: { padding: Spacing.three, borderTopWidth: StyleSheet.hairlineWidth },
 });

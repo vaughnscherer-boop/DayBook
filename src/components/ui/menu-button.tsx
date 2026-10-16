@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-n
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon, type IconName } from '@/components/ui/icon';
-import { Spacing } from '@/constants/theme';
+import { Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type MenuItem = { label: string; icon?: IconName; destructive?: boolean; onPress: () => void };
@@ -75,10 +75,10 @@ const styles = StyleSheet.create({
   menu: {
     position: 'absolute',
     width: MENU_WIDTH,
-    borderRadius: 14,
+    borderRadius: Radius.md, borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-    boxShadow: '0 10px 30px rgba(22, 22, 22, 0.16)',
+    boxShadow: Shadow.raised,
   },
-  item: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two + 2, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 4 },
+  item: { flexDirection: 'row', alignItems: 'center', gap: Spacing.twoHalf, paddingHorizontal: Spacing.three, paddingVertical: Spacing.twoHalf },
 });

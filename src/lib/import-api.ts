@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { todayKey } from '@/lib/dates';
+import { SIGN_IN_FIRST } from '@/lib/server-api';
 import type { PickedFile } from '@/lib/pick-schedule';
 import type { ImportResponse } from '@/lib/schedule-format';
 import { supabase } from '@/lib/supabase';
@@ -49,7 +50,7 @@ export async function readScheduleOnServer(file: PickedFile, deviceId: string, c
 
   const { data: session } = await supabase.auth.getSession();
   if (!session.session) {
-    return { ok: false, error: 'Sign in first (side panel → Account): imports use your Daybook account.' };
+    return { ok: false, error: `${SIGN_IN_FIRST}: imports use your Daybook account.` };
   }
   const { data, error } = await supabase.functions.invoke<ImportResponse>('import-schedule', {
     body: { ...file, course, today: todayKey() },

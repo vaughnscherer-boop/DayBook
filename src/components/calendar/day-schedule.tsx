@@ -99,6 +99,6 @@ export function DaySchedule({ day, items, groups, onOpenItem, onToggleTask }: Pr
 const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three, paddingBottom: Spacing.six, gap: Spacing.three },
   empty: { padding: Spacing.four },
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two + 4 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.twoHalf },
   time: { width: 64, paddingTop: Spacing.three, fontVariant: ['tabular-nums'] },
 });

@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fromKey, todayKey, weekDays } from '@/lib/dates';
 import { tap } from '@/lib/haptics';
@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.three,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  day: { flex: 1, alignItems: 'center', gap: 2, paddingTop: Spacing.two, paddingBottom: Spacing.one + 2, borderRadius: 14 },
+  day: { flex: 1, alignItems: 'center', gap: 2, paddingTop: Spacing.two, paddingBottom: Spacing.two, borderRadius: Radius.md, borderCurve: 'continuous' },
   number: { fontSize: 17, lineHeight: 22, fontWeight: 600, fontVariant: ['tabular-nums'] },
   todayDot: { width: 4, height: 4, borderRadius: 2 },
 });

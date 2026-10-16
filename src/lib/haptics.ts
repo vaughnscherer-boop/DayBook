@@ -13,3 +13,8 @@ export function tap() {
 export function tick() {
   if (enabled) Haptics.selectionAsync().catch(() => {});
 }
+
+/** A success buzz: finishing something with a swipe. */
+export function success() {
+  if (enabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+}

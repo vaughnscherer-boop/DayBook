@@ -148,11 +148,13 @@ export async function saveImport(
         const keywords = [...new Set([...JSON.parse(same.keywords), ...group.keywords])];
         await db.runAsync(
           `UPDATE groups SET keywords = ?, source = 'import', term_id = COALESCE(?, term_id),
-             location = COALESCE(location, ?), office_hours = COALESCE(office_hours, ?), updated_at = ? WHERE id = ?`,
+             location = COALESCE(location, ?), office_hours = COALESCE(office_hours, ?),
+             absence_limit = COALESCE(absence_limit, ?), updated_at = ? WHERE id = ?`,
           JSON.stringify(keywords),
           termId,
           group.location,
           group.office_hours,
+          group.absence_limit,
           new Date().toISOString(),
           same.id
         );
@@ -166,11 +168,12 @@ export async function saveImport(
           source: 'import',
         });
         await db.runAsync(
-          'UPDATE groups SET import_id = ?, term_id = ?, location = ?, office_hours = ? WHERE id = ?',
+          'UPDATE groups SET import_id = ?, term_id = ?, location = ?, office_hours = ?, absence_limit = ? WHERE id = ?',
           importId,
           termId,
           group.location,
           group.office_hours,
+          group.absence_limit,
           id
         );
         groupIds.set(group.course, id);

@@ -29,6 +29,8 @@ export type Task = {
   feed_uid: string | null; // that site's own id for it
   feed_hash: string | null; // the feed's version when last applied
   missed_at: string | null; // when you said you hadn't done it after it was due (it stays, in Overdue)
+  reminders: string | null; // JSON reminder tokens; null = defaults for its type, [] = none
+  minutes: number | null; // how long it should take, when known
   created_at: string;
   updated_at: string;
 };
@@ -51,6 +53,10 @@ export type TaskInput = {
   group?: GroupChoice;
   /** Class, exam, assignment...; null = guess from the title. Leave out to keep the current one. */
   item_type?: ItemType | null;
+  /** Reminder tokens ("1h", "eve-before"…); null = defaults for its type. Leave out to keep the current ones. */
+  reminders?: string[] | null;
+  /** Estimated minutes; null = unknown. Leave out to keep the current estimate. */
+  minutes?: number | null;
 };
 
 const ORDER = 'ORDER BY date, time IS NOT NULL, time, created_at';
@@ -86,6 +92,10 @@ export async function createTask(db: SQLiteDatabase, input: TaskInput): Promise<
     now,
     now
   );
+  if (input.reminders !== undefined && input.reminders !== null) {
+    await db.runAsync('UPDATE tasks SET reminders = ? WHERE id = ?', JSON.stringify(input.reminders), id);
+  }
+  if (input.minutes) await db.runAsync('UPDATE tasks SET minutes = ? WHERE id = ?', input.minutes, id);
   return id;
 }
 
@@ -109,6 +119,10 @@ export async function updateTask(db: SQLiteDatabase, id: string, input: TaskInpu
   if (input.item_type !== undefined) {
     await db.runAsync('UPDATE tasks SET item_type = ? WHERE id = ?', input.item_type, id);
   }
+  if (input.reminders !== undefined) {
+    await db.runAsync('UPDATE tasks SET reminders = ? WHERE id = ?', input.reminders && JSON.stringify(input.reminders), id);
+  }
+  if (input.minutes !== undefined) await db.runAsync('UPDATE tasks SET minutes = ? WHERE id = ?', input.minutes, id);
 }
 
 /** Moves a one-off task to another day (the morning brief's "Move to today"). */

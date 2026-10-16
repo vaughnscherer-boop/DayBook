@@ -1,10 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
+import { parseAskRequest, type AskResponse } from '../src/lib/ask-format.ts';
 import { MAX_BREAKDOWN_TEXT, type BreakdownResponse } from '../src/lib/breakdown-format.ts';
 import type { FeedResponse } from '../src/lib/feed-format.ts';
 import { parseFixRequest, type FixResponse } from '../src/lib/fix-format.ts';
 import { parseGradeRequest, type GradeResponse } from '../src/lib/grade-import-format.ts';
 import { isImportType, MAX_IMPORT_BYTES, MAX_IMPORT_TEXT, TEXT_IMPORT, type ImportResponse } from '../src/lib/schedule-format.ts';
+import { askSchedule } from './ask-schedule.ts';
 import { BreakdownError, breakDown } from './break-down.ts';
 import { ClaudeError } from './claude-json.ts';
 import { fixClass } from './fix-class.ts';
@@ -122,6 +124,27 @@ async function handleSummarize(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+/** POST /api/ask { question, today, now, items } -> { ok, answer, changes }: the local twin of the ask-schedule function. */
+async function handleAsk(req: IncomingMessage, res: ServerResponse) {
+  if (!process.env.ANTHROPIC_API_KEY) return fail(res, 500, 'No ANTHROPIC_API_KEY in .env.local.');
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse((await readBody(req)) ?? '');
+  } catch {
+    return fail(res, 400, 'Bad request.');
+  }
+  const request = parseAskRequest(body);
+  if (typeof request === 'string') return fail(res, 400, request);
+  try {
+    const result: AskResponse = { ok: true, ...(await askSchedule(request, AbortSignal.timeout(60_000))) };
+    send(res, 200, result);
+  } catch (error) {
+    if (error instanceof ClaudeError) return fail(res, 502, error.message);
+    console.error('[ask] failed', error);
+    fail(res, 500, 'Something went wrong.');
+  }
+}
+
 /** POST /api/break-down { title, details, notes, due, today } -> { ok, steps }: the local twin of the break-down function. */
 async function handleBreakDown(req: IncomingMessage, res: ServerResponse) {
   if (!process.env.ANTHROPIC_API_KEY) return fail(res, 500, 'No ANTHROPIC_API_KEY in .env.local.');
@@ -224,6 +247,10 @@ const server = createServer((req, res) => {
   }
   if (req.method === 'POST' && path === '/api/summarize') {
     handleSummarize(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
+    return;
+  }
+  if (req.method === 'POST' && path === '/api/ask') {
+    handleAsk(req, res).catch(() => fail(res, 500, 'Something went wrong.'));
     return;
   }
   if (req.method === 'POST' && path === '/api/break-down') {

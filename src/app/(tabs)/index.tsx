@@ -5,13 +5,16 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTabBarSpace } from '@/components/bottom-bar';
+import { AskBox } from '@/components/home/ask-box';
+import { LoadMeter } from '@/components/home/load-meter';
+import { NextClassCard } from '@/components/next-class-card';
 import { ClassCards } from '@/components/home/class-cards';
 import { OverviewTiles, type Tile } from '@/components/home/overview-tiles';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Icon } from '@/components/ui/icon';
 import { MenuButton } from '@/components/ui/menu-button';
-import { EventColors, Spacing } from '@/constants/theme';
+import { EventColors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { getSettings } from '@/db/settings';
 import { useCalendarData } from '@/hooks/use-calendar-data';
 import { useTheme } from '@/hooks/use-theme';
@@ -96,18 +99,18 @@ export default function HomeScreen() {
               onPress={() => router.push('/settings')}
               accessibilityRole="button"
               accessibilityLabel="Settings"
-              style={[styles.avatar, { backgroundColor: theme.accent }]}>
+              style={[styles.circle, { backgroundColor: theme.backgroundElement }]}>
               {name ? (
-                <ThemedText style={[styles.initial, { color: theme.onAccent }]}>{name[0]}</ThemedText>
+                <ThemedText style={styles.initial}>{name[0]}</ThemedText>
               ) : (
-                <Icon name="settings" size={20} color={theme.onAccent} />
+                <Icon name="settings" size={20} color={theme.text} />
               )}
             </Pressable>
             <View style={styles.flex}>
               <ThemedText type="small" themeColor="textSecondary">
                 {greeting(new Date())}
               </ThemedText>
-              <ThemedText style={styles.name} numberOfLines={1}>
+              <ThemedText style={styles.name} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 {name || 'Welcome back'}
               </ThemedText>
             </View>
@@ -115,8 +118,9 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/tasks', params: { filter: 'overdue' } })}
               accessibilityRole="button"
               accessibilityLabel={`${overdue.length} overdue tasks`}
-              style={[styles.bell, { borderColor: theme.backgroundSelected }]}>
-              <Icon name="bell" size={19} color={theme.text} />
+              style={[styles.circle, { backgroundColor: theme.backgroundElement }]}>
+              {/* A clock, not a bell: it opens what's overdue, not notifications. */}
+              <Icon name="clock" size={20} color={theme.text} />
               {overdue.length > 0 && (
                 <View style={[styles.badge, { backgroundColor: theme.danger }]}>
                   <ThemedText style={styles.badgeText}>{overdue.length}</ThemedText>
@@ -125,10 +129,13 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
+          <AskBox items={items} groups={groups} today={today} />
+          <NextClassCard items={items} groups={groups} />
+
           <View style={styles.sectionHead}>
-            <ThemedText style={styles.sectionTitle}>Overview</ThemedText>
+            <ThemedText type="heading">Overview</ThemedText>
             <MenuButton
-              accessibilityLabel="Change range"
+              accessibilityLabel={`Range: ${rangeLabel}`}
               items={RANGES.map((r) => ({ label: r.label, onPress: () => setRange(r.value) }))}>
               <View style={[styles.dropdown, { borderColor: theme.backgroundSelected }]}>
                 <ThemedText type="small">{rangeLabel}</ThemedText>
@@ -137,9 +144,10 @@ export default function HomeScreen() {
             </MenuButton>
           </View>
           <OverviewTiles tiles={tiles} />
+          <LoadMeter items={items} today={today} />
 
           <View style={styles.sectionHead}>
-            <ThemedText style={styles.sectionTitle}>Classes</ThemedText>
+            <ThemedText type="heading">Classes</ThemedText>
           </View>
           <ClassCards
             groups={groups}
@@ -158,33 +166,39 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three, gap: Spacing.three },
-  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two + 4, marginBottom: Spacing.two },
-  avatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.twoHalf, marginBottom: Spacing.two },
+  // Settings (left) and Overdue (right) as a matching pair of quiet buttons.
+  circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', boxShadow: Shadow.card },
   initial: { fontSize: 19, fontWeight: 800 },
   flex: { flex: 1 },
   name: { fontSize: 20, lineHeight: 25, fontWeight: 800, letterSpacing: -0.3 },
-  bell: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute',
     top: -3,
     right: -3,
     minWidth: 18,
     height: 18,
-    borderRadius: 9,
+    borderRadius: Radius.full,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badgeText: { color: '#FFFFFF', fontSize: 11, lineHeight: 13, fontWeight: 800 },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.two },
-  sectionTitle: { fontSize: 24, lineHeight: 30, fontWeight: 800, letterSpacing: -0.5 },
+  sectionHead: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
   dropdown: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: Spacing.one,
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: Spacing.two + 2,
-    paddingVertical: Spacing.one + 2,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.twoHalf,
+    paddingVertical: Spacing.two,
   },
 });

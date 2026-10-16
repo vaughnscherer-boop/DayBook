@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const LATEST_VERSION = 17;
+const LATEST_VERSION = 20;
 
 /**
  * Creates/upgrades the database schema. Each time the schema changes, add a new
@@ -405,6 +405,66 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     // Daybook doesn't ask about it again.
     await db.execAsync(`ALTER TABLE tasks ADD COLUMN missed_at TEXT;`);
     version = 17;
+  }
+
+  if (version < 18) {
+    // Reminders picked for an item (JSON array of tokens like "1h" or "eve-before"); null = the
+    // defaults for its type, [] = none.
+    await db.execAsync(`
+      ALTER TABLE tasks ADD COLUMN reminders TEXT;
+      ALTER TABLE events ADD COLUMN reminders TEXT;
+    `);
+    version = 18;
+  }
+
+  if (version < 19) {
+    // Planning: how long a task should take (minutes), work blocks planned for a task ("Plan this"),
+    // and focus-timer sessions, which sync so durations add up across devices.
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const when = 'WHEN (SELECT applying FROM sync_meta) = 0';
+    const note = (row: 'NEW' | 'OLD') =>
+      `INSERT OR REPLACE INTO sync_outbox (tbl, id, changed_at) VALUES ('focus_sessions', ${row}.id, ${now});`;
+    await db.execAsync(`
+      ALTER TABLE tasks ADD COLUMN minutes INTEGER;
+      ALTER TABLE events ADD COLUMN task_id TEXT;
+      CREATE TABLE focus_sessions (
+        id TEXT PRIMARY KEY NOT NULL,
+        task_id TEXT,
+        group_id TEXT,              -- the task's class then, so a class's totals survive the task
+        item_type TEXT,
+        started_at TEXT NOT NULL,
+        minutes INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TRIGGER sync_focus_sessions_insert AFTER INSERT ON focus_sessions ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_focus_sessions_update AFTER UPDATE ON focus_sessions ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_focus_sessions_delete AFTER DELETE ON focus_sessions ${when} BEGIN ${note('OLD')} END;
+    `);
+    version = 19;
+  }
+
+  if (version < 20) {
+    // Attendance: whether you went to each class meeting, and how many absences the class allows.
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const when = 'WHEN (SELECT applying FROM sync_meta) = 0';
+    const note = (row: 'NEW' | 'OLD') =>
+      `INSERT OR REPLACE INTO sync_outbox (tbl, id, changed_at) VALUES ('attendance', ${row}.id, ${now});`;
+    await db.execAsync(`
+      ALTER TABLE groups ADD COLUMN absence_limit INTEGER;
+      CREATE TABLE attendance (
+        id TEXT PRIMARY KEY NOT NULL,   -- <event id>|<date>
+        event_id TEXT NOT NULL,
+        group_id TEXT,
+        day TEXT NOT NULL,              -- 'YYYY-MM-DD'
+        status TEXT NOT NULL,           -- 'went' | 'skipped' | 'cancelled'
+        updated_at TEXT NOT NULL
+      );
+      CREATE TRIGGER sync_attendance_insert AFTER INSERT ON attendance ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_attendance_update AFTER UPDATE ON attendance ${when} BEGIN ${note('NEW')} END;
+      CREATE TRIGGER sync_attendance_delete AFTER DELETE ON attendance ${when} BEGIN ${note('OLD')} END;
+    `);
+    version = 20;
   }
 
   await db.execAsync(`PRAGMA user_version = ${version}`);

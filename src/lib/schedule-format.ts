@@ -51,6 +51,8 @@ export type ScheduleCourse = {
   items: ScheduleItem[];
   /** How the course grade is weighted; [] when the document doesn't say. Older saved reads lack it. */
   grading?: ScheduleGrading[];
+  /** Absences allowed before the grade suffers ("more than 3 absences…" -> 3), or null. Older reads lack it. */
+  absence_limit?: number | null;
 };
 
 export type ScheduleImport = {
@@ -104,6 +106,10 @@ export const SCHEDULE_SCHEMA = object({
           last_date: { ...nullable('string'), description: 'Last meeting (YYYY-MM-DD), or null' },
           cancelled_dates: { type: 'array', items: date('A date this meeting does not happen') },
         }),
+      },
+      absence_limit: {
+        ...nullable('integer'),
+        description: 'How many absences the attendance policy allows before it affects the grade, or null if it says nothing',
       },
       grading: {
         type: 'array',
